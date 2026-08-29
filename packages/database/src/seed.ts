@@ -1,51 +1,41 @@
 import {
   db,
-  workspaces,
-  developers,
-  repositories,
-  repoSnapshots,
-  repoSnapshotFiles,
-  prompts,
-  apiRequests,
-  toolEvents,
+  dataSource,
+  Workspace,
+  Developer,
+  Repository,
+  RepoSnapshot,
+  RepoSnapshotFile,
+  Prompt,
+  ApiRequest,
+  ToolEvent,
 } from "./index";
 import { hashKey } from "./auth";
-import { eq } from "drizzle-orm";
 
 const key = process.env.TOKENLENS_INGEST_KEY ?? "development-key-change-me";
-const database = db();
+const database = await db();
 let seed = 42;
 const rnd = () =>
   (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 2 ** 32;
 
-const [workspace] = await database
-  .insert(workspaces)
-  .values({
+const workspaceRepository = database.getRepository(Workspace);
+let workspace = await workspaceRepository.findOneBy({ ingestKeyHash: hashKey(key) });
+workspace = await workspaceRepository.save({
+    ...workspace,
     name: "TokenLens demo",
     ingestKeyHash: hashKey(key),
     capturePrompts: false,
     isDemo: true,
-  })
-  .onConflictDoUpdate({
-    target: workspaces.ingestKeyHash,
-    set: { name: "TokenLens demo", isDemo: true },
-  })
-  .returning();
-await database
-  .delete(repositories)
-  .where(eq(repositories.workspaceId, workspace.id));
-await database
-  .delete(developers)
-  .where(eq(developers.workspaceId, workspace.id));
+  });
+await database.getRepository(Repository).delete({ workspaceId: workspace.id });
+await database.getRepository(Developer).delete({ workspaceId: workspace.id });
 
 const developerSpecs = [
   ["alex@example.test", "claude"],
   ["jamie@example.test", "codex"],
   ["sam@example.test", "claude"],
 ] as const;
-const devs = await database
-  .insert(developers)
-  .values(
+const devs = await database.getRepository(Developer).save(
     developerSpecs.map(([email, provider], i) => ({
       workspaceId: workspace.id,
       provider,
@@ -54,8 +44,7 @@ const devs = await database
       firstSeenAt: new Date("2026-05-01"),
       lastSeenAt: new Date("2026-08-20"),
     })),
-  )
-  .returning();
+  );
 
 const specs = [
   { name: "legacy-platform", loc: 1_400_000, files: 6842, packages: 31, scale: 2.4 },
@@ -68,23 +57,18 @@ const tools: any[] = [];
 let promptNo = 0;
 
 for (const [ri, spec] of specs.entries()) {
-  const [repo] = await database
-    .insert(repositories)
-    .values({
+  const repo = await database.getRepository(Repository).save({
       workspaceId: workspace.id,
       repoKey: `github.com/demo/${spec.name}`,
       name: spec.name,
       remoteHost: "github.com",
       remoteOwner: "demo",
       remoteName: spec.name,
-    })
-    .returning();
+    });
   let activeSnapshot: any;
   for (let si = 0; si < 2; si++) {
     const factor = 1 + si * 0.025;
-    const [snapshot] = await database
-      .insert(repoSnapshots)
-      .values({
+    const snapshot = await database.getRepository(RepoSnapshot).save({
         repositoryId: repo.id,
         fingerprint: `demo-${ri}-${si}`,
         headSha: `${ri}${si}`.repeat(20),
@@ -132,8 +116,7 @@ for (const [ri, spec] of specs.entries()) {
           javascript: { files: Math.round(spec.files * 0.12), loc: Math.round(spec.loc * 0.1) },
           python: { files: Math.round(spec.files * 0.1), loc: Math.round(spec.loc * 0.08) },
         },
-      })
-      .returning();
+      });
     activeSnapshot = snapshot;
     const files = Array.from({ length: 60 }, (_, i) => {
       const moduleName = `packages/module-${i % spec.packages}`;
@@ -156,7 +139,7 @@ for (const [ri, spec] of specs.entries()) {
         inDependencyCycle: i % 17 === 0,
       };
     });
-    await database.insert(repoSnapshotFiles).values(files);
+    await database.getRepository(RepoSnapshotFile).insert(files);
   }
 
   const count = ri === 0 ? 75 : ri === 1 ? 65 : 55;
@@ -170,9 +153,7 @@ for (const [ri, spec] of specs.entries()) {
         spec.scale *
         (0.88 + rnd() * 0.24),
     );
-    const [p] = await database
-      .insert(prompts)
-      .values({
+    const p = await database.getRepository(Prompt).save({
         workspaceId: workspace.id,
         provider,
         externalPromptId: `demo-${provider}-prompt-${promptNo}`,
@@ -187,8 +168,7 @@ for (const [ri, spec] of specs.entries()) {
         dirty: false,
         startedAt: started,
         hookReceivedAt: new Date(+started + 100),
-      })
-      .returning();
+      });
     const model = provider === "codex" ? "gpt-5.6-sol" : "claude-sonnet-4-5";
     const calls = 2 + Math.floor(rnd() * 4);
     for (let a = 0; a < calls; a++)
@@ -227,11 +207,11 @@ for (const [ri, spec] of specs.entries()) {
 }
 
 for (let i = 0; i < api.length; i += 500)
-  await database.insert(apiRequests).values(api.slice(i, i + 500));
+  await database.getRepository(ApiRequest).insert(api.slice(i, i + 500));
 for (let i = 0; i < tools.length; i += 500)
-  await database.insert(toolEvents).values(tools.slice(i, i + 500));
+  await database.getRepository(ToolEvent).insert(tools.slice(i, i + 500));
 console.log(
   `Seeded ${specs.length} repositories, ${devs.length} developers, ${promptNo} prompts, ${api.length} model responses and ${tools.length} tool events.`,
 );
 console.log(`Demo ingest key: ${key}`);
-process.exit(0);
+await dataSource.destroy();

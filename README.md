@@ -32,7 +32,6 @@ Use the current Node.js LTS and pnpm:
 cp .env.example .env
 pnpm install
 docker compose up -d
-pnpm db:migrate
 pnpm demo:seed
 pnpm test
 pnpm dev
@@ -114,8 +113,11 @@ pnpm exec tsc --noEmit
 pnpm build
 pnpm turbo build --filter=@tokenlens/web
 pnpm exec playwright test
-pnpm db:generate
 ```
+
+The backend runs pending TypeORM migrations automatically when it first connects
+to PostgreSQL. `pnpm db:migrate` is available for deployments that want to apply
+them before starting the application.
 
 ## Troubleshooting
 

@@ -1,1 +1,5 @@
-import postgres from "postgres";import {drizzle} from "drizzle-orm/postgres-js";import {migrate} from "drizzle-orm/postgres-js/migrator";const client=postgres(process.env.DATABASE_URL??"postgres://tokenlens:tokenlens@localhost:5432/tokenlens",{max:1});await migrate(drizzle(client),{migrationsFolder:"packages/database/drizzle"});await client.end();console.log("Database migrations applied");
+import { dataSource, db } from "./index";
+
+await db();
+await dataSource.destroy();
+console.log("Database migrations applied");

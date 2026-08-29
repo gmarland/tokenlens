@@ -1,2 +1,27 @@
-import postgres from "postgres";import {drizzle} from "drizzle-orm/postgres-js";import * as schema from "./schema";
-let singleton:ReturnType<typeof drizzle<typeof schema>>|undefined;export function db(){if(!singleton){const client=postgres(process.env.DATABASE_URL??"postgres://tokenlens:tokenlens@localhost:5432/tokenlens");singleton=drizzle(client,{schema})}return singleton}export * from "./schema";
+import "reflect-metadata";
+import { DataSource } from "typeorm";
+import { entities } from "./entities";
+import { InitialSchema2026082900000 } from "./migrations/2026082900000-InitialSchema";
+
+export const dataSource = new DataSource({
+  type: "postgres",
+  url: process.env.DATABASE_URL ?? "postgres://tokenlens:tokenlens@localhost:5432/tokenlens",
+  entities,
+  migrations: [InitialSchema2026082900000],
+  migrationsRun: true,
+  migrationsTableName: "typeorm_migrations",
+  synchronize: false,
+});
+
+let initialization: Promise<DataSource> | undefined;
+
+export function db(): Promise<DataSource> {
+  if (dataSource.isInitialized) return Promise.resolve(dataSource);
+  initialization ??= dataSource.initialize().catch((error) => {
+    initialization = undefined;
+    throw error;
+  });
+  return initialization;
+}
+
+export * from "./entities";
