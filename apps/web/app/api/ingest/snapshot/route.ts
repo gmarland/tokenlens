@@ -1,0 +1,1 @@
+import{snapshotSchema}from"@tokenlens/shared";import{ingestSnapshot}from"@tokenlens/database/services";import{ingest}from"../../../../lib/http";export const POST=(req:any)=>ingest(req,async(w,b)=>{const s=await ingestSnapshot(w.id,snapshotSchema.parse(b));return{id:s.id}},20_000_000);

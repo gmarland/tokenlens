@@ -1,0 +1,1 @@
+{"name":"@tokenlens/repo-analyzer","private":true,"type":"module","exports":{".":"./src/index.ts"},"scripts":{"build":"tsc -b tsconfig.build.json","test":"vitest run --root ../.. packages/repo-analyzer/src"},"dependencies":{"@tokenlens/analytics":"workspace:*","@tokenlens/shared":"workspace:*","typescript":"5.9.2"}}

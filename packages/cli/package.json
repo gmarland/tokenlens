@@ -1,0 +1,1 @@
+{"name":"@tokenlens/cli","private":true,"type":"module","bin":{"repo-profiler":"./bin/repo-profiler.mjs"},"scripts":{"build":"tsc -b tsconfig.build.json","test":"vitest run --root ../.. packages/cli/src"},"dependencies":{"@tokenlens/repo-analyzer":"workspace:*","@tokenlens/shared":"workspace:*","tsx":"4.20.5"}}

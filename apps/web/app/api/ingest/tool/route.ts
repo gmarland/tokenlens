@@ -1,0 +1,1 @@
+import{toolHookSchema}from"@tokenlens/shared";import{ingestTool}from"@tokenlens/database/services";import{ingest}from"../../../../lib/http";export const POST=(req:any)=>ingest(req,async(w,b)=>{await ingestTool(w.id,toolHookSchema.parse(b));return{accepted:true}},64_000);

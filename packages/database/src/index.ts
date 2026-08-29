@@ -1,0 +1,2 @@
+import postgres from "postgres";import {drizzle} from "drizzle-orm/postgres-js";import * as schema from "./schema";
+let singleton:ReturnType<typeof drizzle<typeof schema>>|undefined;export function db(){if(!singleton){const client=postgres(process.env.DATABASE_URL??"postgres://tokenlens:tokenlens@localhost:5432/tokenlens");singleton=drizzle(client,{schema})}return singleton}export * from "./schema";

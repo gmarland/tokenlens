@@ -1,0 +1,1 @@
+import{NextResponse}from"next/server";import{promptDetail}from"../../../../lib/data";export async function GET(_:Request,{params}:{params:Promise<{id:string}>}){const x=await promptDetail((await params).id);return x?NextResponse.json(x):NextResponse.json({error:"not found"},{status:404})}

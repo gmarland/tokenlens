@@ -1,0 +1,1 @@
+import{parseOtlp}from"@tokenlens/otel-parser";import{ingestOtel}from"@tokenlens/database/services";import{ingest}from"../../../../../../lib/http";export const POST=(req:any)=>ingest(req,async(w,b)=>{const events=parseOtlp(b);await ingestOtel(w.id,events);return{partialSuccess:{rejectedLogRecords:0}}},5_000_000);

@@ -1,0 +1,29 @@
+{
+  "resourceLogs": [
+    {
+      "resource": {
+        "attributes": [
+          { "key": "conversation.id", "value": { "stringValue": "codex-session-1" } },
+          { "key": "model", "value": { "stringValue": "gpt-5.6-sol" } }
+        ]
+      },
+      "scopeLogs": [
+        {
+          "logRecords": [
+            {
+              "timeUnixNano": "1700000000000000000",
+              "attributes": [
+                { "key": "event.name", "value": { "stringValue": "codex.sse_event" } },
+                { "key": "event.kind", "value": { "stringValue": "response.completed" } },
+                { "key": "turn.id", "value": { "stringValue": "codex-turn-1" } },
+                { "key": "input_token_count", "value": { "intValue": "1000" } },
+                { "key": "cached_input_token_count", "value": { "intValue": "700" } },
+                { "key": "output_token_count", "value": { "intValue": "100" } }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

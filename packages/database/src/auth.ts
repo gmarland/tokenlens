@@ -1,0 +1,3 @@
+import {createHash,timingSafeEqual} from "node:crypto";import {eq} from "drizzle-orm";import {db,workspaces} from "./index";
+export const hashKey=(key:string)=>createHash("sha256").update(key).digest("hex");
+export async function authenticate(header:string|null){if(!header?.startsWith("Bearer "))return null;const digest=hashKey(header.slice(7));const [workspace]=await db().select().from(workspaces).where(eq(workspaces.ingestKeyHash,digest)).limit(1);if(!workspace)return null;const a=Buffer.from(workspace.ingestKeyHash),b=Buffer.from(digest);return a.length===b.length&&timingSafeEqual(a,b)?workspace:null}
