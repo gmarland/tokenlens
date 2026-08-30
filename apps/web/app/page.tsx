@@ -1,13 +1,7 @@
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
-import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
-import FormControl from "@mui/material/FormControl";
-import InputLabel from "@mui/material/InputLabel";
 import MuiLink from "@mui/material/Link";
-import MenuItem from "@mui/material/MenuItem";
-import Select from "@mui/material/Select";
-import Stack from "@mui/material/Stack";
 import Table from "@mui/material/Table";
 import TableBody from "@mui/material/TableBody";
 import TableCell from "@mui/material/TableCell";
@@ -16,6 +10,7 @@ import TableRow from "@mui/material/TableRow";
 import Typography from "@mui/material/Typography";
 import { spearman, relationship } from "@tokenlens/analytics";
 import { ScatterPlot } from "../components/charts";
+import { AnalysisFilters } from "../components/filters";
 import Link from "../components/link";
 import {
   Cards, EmptyState, Eyebrow, Intro, Label, MetricCard, Page, Panel,
@@ -30,9 +25,7 @@ export default async function Home({ searchParams }: {
   searchParams: Promise<{ model?: string; provider?: string }>;
 }) {
   const q = await searchParams;
-  const initial = await overview(q.model, q.provider).catch(() => ({
-    summary: {}, repositories: [], models: [], providers: [],
-  }));
+  const initial = await overview(q.model, q.provider);
   const total = initial.models.reduce((n: number, x: any) => n + x.count, 0);
   const dominant = initial.models[0] && initial.models[0].count / total >= 0.8
     ? initial.models[0].model
@@ -76,25 +69,19 @@ export default async function Home({ searchParams }: {
 
       <Toolbar>
         <SectionTitle>Repositories</SectionTitle>
-        <Stack component="form" direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ width: { xs: "100%", md: "auto" } }}>
-          <FormControl size="small" sx={{ minWidth: 145 }}>
-            <InputLabel id="provider-label">Provider</InputLabel>
-            <Select labelId="provider-label" label="Provider" name="provider" defaultValue={q.provider ?? ""}>
-              <MenuItem value="">All providers</MenuItem>
-              {providers.map((p: any) => (
-                <MenuItem value={p.provider} key={p.provider}>{p.provider === "codex" ? "Codex" : "Claude Code"}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <FormControl size="small" sx={{ minWidth: 210 }}>
-            <InputLabel id="model-label">Analysis model</InputLabel>
-            <Select labelId="model-label" label="Analysis model" name="model" defaultValue={selected ?? ""}>
-              <MenuItem value="">Choose analysis model</MenuItem>
-              {models.map((m: any) => <MenuItem value={m.model} key={m.model}>{m.model}</MenuItem>)}
-            </Select>
-          </FormControl>
-          <Button type="submit" variant="contained">Apply</Button>
-        </Stack>
+        <AnalysisFilters
+          key={`${q.provider ?? ""}:${selected ?? ""}`}
+          idPrefix="overview"
+          initialProvider={q.provider}
+          initialModel={selected}
+          providers={providers.map((p: any) => ({
+            value: p.provider,
+            label: p.provider === "codex" ? "Codex" : "Claude Code",
+          }))}
+          models={models.map((m: any) => ({ value: m.model, label: m.model }))}
+          modelLabel="Analysis model"
+          modelPlaceholder="Choose analysis model"
+        />
       </Toolbar>
 
       <ResponsiveTable>
@@ -102,6 +89,7 @@ export default async function Home({ searchParams }: {
           <Table>
             <TableHead><TableRow>
               <TableCell>Repository</TableCell>
+              <TableCell sx={numericCellSx}>Source files</TableCell>
               <TableCell sx={numericCellSx}>LOC</TableCell>
               <TableCell sx={numericCellSx}>Prompts</TableCell>
               <TableCell sx={numericCellSx}>Median context</TableCell>
@@ -113,6 +101,7 @@ export default async function Home({ searchParams }: {
                   <TableCell>
                     <MuiLink component={Link} href={`/repos/${r.id}${query.size ? `?${query}` : ""}`} color="inherit" underline="hover" sx={{ fontWeight: 650 }}>{r.name}</MuiLink>
                   </TableCell>
+                  <TableCell sx={numericCellSx}>{compact(r.source_files)}</TableCell>
                   <TableCell sx={numericCellSx}>{compact(r.loc)}</TableCell>
                   <TableCell sx={numericCellSx}>{r.prompts}</TableCell>
                   <TableCell sx={numericCellSx}>{compact(r.median_context)}</TableCell>

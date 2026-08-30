@@ -1,16 +1,11 @@
 import Box from "@mui/material/Box";
-import Button from "@mui/material/Button";
 import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
-import FormControl from "@mui/material/FormControl";
-import InputLabel from "@mui/material/InputLabel";
-import MenuItem from "@mui/material/MenuItem";
-import Select from "@mui/material/Select";
-import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import { correlations, median, relationship } from "@tokenlens/analytics";
 import { notFound } from "next/navigation";
 import { Trend } from "../../../components/charts";
+import { AnalysisFilters } from "../../../components/filters";
 import { BackLink, Cards, EmptyState, Eyebrow, Intro, Label, MetricCard, Page, Panel, SectionTitle, StatCard, Toolbar } from "../../../components/ui";
 import { repository } from "../../../lib/data";
 import { compact, duration } from "../../../lib/format";
@@ -45,18 +40,19 @@ export default async function Repo({ params, searchParams }: any) {
       <Box sx={{ mt: 3 }}><Eyebrow>Repository</Eyebrow><Typography variant="h1">{data.repo.name}</Typography>
         <Intro>Observed structure and coding-agent behaviour. Analysis model: <Box component="strong">{selected ?? "select a model"}</Box></Intro>
       </Box>
-      <Stack component="form" direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ width: { xs: "100%", md: "auto" } }}>
-        <FormControl size="small" sx={{ minWidth: 145 }}><InputLabel id="repo-provider-label">Provider</InputLabel>
-          <Select labelId="repo-provider-label" label="Provider" name="provider" defaultValue={q.provider ?? ""}>
-            <MenuItem value="">All providers</MenuItem>{data.providers.map((p: any) => <MenuItem value={p.provider} key={p.provider}>{p.provider === "codex" ? "Codex" : "Claude Code"}</MenuItem>)}
-          </Select>
-        </FormControl>
-        <FormControl size="small" sx={{ minWidth: 190 }}><InputLabel id="repo-model-label">Model</InputLabel>
-          <Select labelId="repo-model-label" label="Model" name="model" defaultValue={selected ?? ""}>
-            <MenuItem value="">Choose model</MenuItem>{data.models.map((m: any) => <MenuItem value={m.model} key={m.model}>{m.model}</MenuItem>)}
-          </Select>
-        </FormControl><Button type="submit" variant="contained">Apply</Button>
-      </Stack>
+      <AnalysisFilters
+        key={`${q.provider ?? ""}:${selected ?? ""}`}
+        idPrefix="repository"
+        initialProvider={q.provider}
+        initialModel={selected}
+        providers={data.providers.map((provider: any) => ({
+          value: provider.provider,
+          label: provider.provider === "codex" ? "Codex" : "Claude Code",
+        }))}
+        models={data.models.map((model: any) => ({ value: model.model, label: model.model }))}
+        modelLabel="Model"
+        modelPlaceholder="Choose model"
+      />
     </Toolbar>
     <Cards>
       <MetricCard label="Source LOC" value={compact(s.total_source_loc)} /><MetricCard label="Source files" value={compact(s.source_files)} />

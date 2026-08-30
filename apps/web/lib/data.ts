@@ -24,18 +24,20 @@ export async function overview(model?: string, provider?: string) {
 
   const repositoryParameters = new Parameters();
   const modelWhere = model ? `and model=${repositoryParameters.add(model)}` : "";
+  const selectedModel = repositoryParameters.add(model ?? null);
   const repositories = await rows(`with usage as (
       select p.repository_id,count(distinct p.id)::int prompts,
         percentile_cont(.5) within group(order by coalesce(u.context_tokens,0)) median_context,
         percentile_cont(.5) within group(order by coalesce(t.files_read,0)) median_files
       from prompts p
-      join lateral(select sum(input_tokens+cache_read_tokens+cache_creation_tokens) context_tokens
-        from api_requests where prompt_id=p.id ${modelWhere} having count(*)>0)u on true
+      join lateral(select sum(input_tokens+cache_read_tokens+cache_creation_tokens) context_tokens,max(model) model
+        from api_requests where prompt_id=p.id ${modelWhere})u on true
       left join lateral(select count(distinct relative_file_path) files_read from tool_events
         where prompt_id=p.id and tool_name='Read')t on true
-      where true ${providerWhere(provider, repositoryParameters)} group by p.repository_id
+      where (${selectedModel}::text is null or u.model=${selectedModel} or (u.model is null and p.model=${selectedModel}))
+        ${providerWhere(provider, repositoryParameters)} group by p.repository_id
     ), latest as(select distinct on(repository_id)* from repo_snapshots order by repository_id,captured_at desc)
-    select r.id,r.name,l.total_source_loc loc,coalesce(u.prompts,0) prompts,
+    select r.id,r.name,l.source_files,l.total_source_loc loc,coalesce(u.prompts,0) prompts,
       coalesce(u.median_context,0) median_context,coalesce(u.median_files,0) median_files
     from repositories r left join latest l on l.repository_id=r.id left join usage u on u.repository_id=r.id
     where u.repository_id is not null order by median_context desc`, repositoryParameters);
@@ -78,7 +80,8 @@ export async function repository(id: string, model?: string, provider?: string) 
       from tool_events te left join repo_snapshot_files f on f.snapshot_id=p.snapshot_id and f.path=te.relative_file_path
       where te.prompt_id=p.id)t on true
     where p.repository_id=${repositoryId}::uuid ${promptProviderWhere}
-      and (${selectedModel}::text is null or u.model=${selectedModel}) order by p.started_at`, promptParameters);
+      and (${selectedModel}::text is null or u.model=${selectedModel} or (u.model is null and p.model=${selectedModel}))
+    order by p.started_at`, promptParameters);
 
   const modelParameters = new Parameters();
   const models = await rows(`select a.model,count(*)::int count from api_requests a join prompts p on p.id=a.prompt_id
@@ -109,7 +112,8 @@ export async function repositoryPrompts(id: string, sort = "context", model?: st
       from tool_events t left join repo_snapshot_files f on f.snapshot_id=p.snapshot_id and f.path=t.relative_file_path
       where t.prompt_id=p.id)t on true
     where p.repository_id=${repositoryId}::uuid ${providerWhere(provider, parameters)}
-      and (${selectedModel}::text is null or u.model=${selectedModel}) order by ${order}`, parameters);
+      and (${selectedModel}::text is null or u.model=${selectedModel} or (u.model is null and p.model=${selectedModel}))
+    order by ${order}`, parameters);
 }
 
 export async function promptDetail(id: string) {
