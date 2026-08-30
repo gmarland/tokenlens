@@ -42,7 +42,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 </Box>
                 <Chip
                   size="small"
-                  label={`Prompt capture: ${process.env.CAPTURE_PROMPTS === "true" ? "ON" : "OFF"}`}
+                  label="Prompt capture: ON"
                   sx={{ bgcolor: "text.primary", color: "common.white", fontSize: 11 }}
                 />
               </Toolbar>

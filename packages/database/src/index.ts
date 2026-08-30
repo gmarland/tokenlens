@@ -2,12 +2,13 @@ import "reflect-metadata";
 import { DataSource } from "typeorm";
 import { entities } from "./entities";
 import { InitialSchema2026082900000 } from "./migrations/2026082900000-InitialSchema";
+import { AlwaysCapturePrompts2026083000000 } from "./migrations/2026083000000-AlwaysCapturePrompts";
 
 export const dataSource = new DataSource({
   type: "postgres",
   url: process.env.DATABASE_URL ?? "postgres://tokenlens:tokenlens@localhost:5432/tokenlens",
   entities,
-  migrations: [InitialSchema2026082900000],
+  migrations: [InitialSchema2026082900000, AlwaysCapturePrompts2026083000000],
   migrationsRun: true,
   migrationsTableName: "typeorm_migrations",
   synchronize: false,

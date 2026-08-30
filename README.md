@@ -51,6 +51,13 @@ repo-profiler install --provider codex --endpoint http://localhost:3000 --key de
 # or: repo-profiler install --provider all ...
 ```
 
+When invoking the repository's npm script instead of a globally installed
+binary, include npm's `--` argument separator and use a plain URL:
+
+```bash
+npm run repo-profiler -- install --provider codex --endpoint http://localhost:3000 --key development-key-change-me
+```
+
 For Codex, open `/hooks` once after installation and review and trust the two
 TokenLens hooks. Check either integration with:
 
@@ -70,22 +77,22 @@ Scan on demand with `repo-profiler scan .`; `--force` bypasses the local snapsho
 cache. Remove only TokenLens-owned settings with
 `repo-profiler uninstall --provider claude|codex|all`.
 
-Prompt text is disabled by default. Explicitly opt in with
-`--capture-prompts`. Both providers otherwise send only prompt length.
+Prompt capture is always enabled. Both providers send the prompt body and its
+character length; provider telemetry is used to attribute prompts to the
+developer who owns the session.
 
 ## Privacy and security
 
-By default, the server receives provider, prompt/session identifiers, prompt
+The server receives provider, prompt/session identifiers, prompt text and
 character length, available developer identity, normalized Git remote identity,
 branch/commit/dirty state, relative file paths, token totals, model and tool
 metadata, and repository/file structural metrics.
 
-It does **not** receive prompt text unless opted in, assistant responses, source
-contents, tool output, search patterns, matched text, raw terminal output,
-credentials from Git remotes, or absolute local paths. Source and dependency
-analysis happens locally. Ingest routes require a bearer secret; only its SHA-256
-digest is stored in PostgreSQL. Payloads are size-limited and relative paths
-reject traversal.
+It does **not** receive assistant responses, source contents, tool output, search
+patterns, matched text, raw terminal output, credentials from Git remotes, or
+absolute local paths. Source and dependency analysis happens locally. Ingest
+routes require a bearer secret; only its SHA-256 digest is stored in PostgreSQL.
+Payloads are size-limited and relative paths reject traversal.
 
 Codex plan usage does not expose a comparable per-turn dollar cost, so TokenLens
 records Codex cost as unavailable. OpenAI cached input is normalized as a subset
@@ -127,5 +134,6 @@ the agent and written to `~/.repo-profiler/diagnostics.log`.
 Claude should emit `claude_code.user_prompt`, `claude_code.api_request`, and
 `claude_code.tool_result`. Codex should emit `codex.user_prompt`, completed
 `codex.sse_event` or `codex.websocket_event` records, and `codex.tool_result` to
-`/api/ingest/otel/v1/logs`. Do not enable prompt or tool-content telemetry unless
-your privacy policy explicitly allows it.
+`/api/ingest/otel/v1/logs`. Because TokenLens always captures prompt text, only
+install it where that collection is permitted by your privacy policy. Tool
+contents remain disabled.

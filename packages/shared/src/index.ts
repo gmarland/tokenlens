@@ -16,7 +16,7 @@ export const promptHookSchema = z.object({
   promptId: z.string().min(1),
   sessionId: z.string().min(1),
   promptLength: z.number().int().nonnegative(),
-  promptText: z.string().optional(),
+  promptText: z.string(),
   model: z.string().optional(),
   repoKey: z.string().min(1).optional(),
   repoName: z.string().optional(),

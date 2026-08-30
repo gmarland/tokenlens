@@ -32,7 +32,7 @@ export default async function Prompts({ params, searchParams }: any) {
     <BackLink href={`/repos/${id}${back.size ? `?${back}` : ""}`}>← Repository</BackLink>
     <Eyebrow sx={{ mt: 3 }}>Prompt explorer</Eyebrow>
     <Typography variant="h1">Observed prompts</Typography>
-    <Intro>Prompt bodies remain hidden unless capture was explicitly enabled. Sort by {sortLink("context", "context")}, {sortLink("cost", "cost")}, {sortLink("files", "files")}, {sortLink("repeated reads", "repeated")}, or {sortLink("first edit", "edit")}.</Intro>
+    <Intro>Prompt bodies are captured and attributed to the provider identity reported for the session. Sort by {sortLink("context", "context")}, {sortLink("cost", "cost")}, {sortLink("files", "files")}, {sortLink("repeated reads", "repeated")}, or {sortLink("first edit", "edit")}.</Intro>
     <ResponsiveTable>
       {rows.length ? <Table size="small">
         <TableHead><TableRow>
@@ -41,7 +41,7 @@ export default async function Prompts({ params, searchParams }: any) {
         </TableRow></TableHead>
         <TableBody>{rows.map((p: any) => <TableRow key={p.id} hover>
           <TableCell>{date(p.started_at)}</TableCell><TableCell><Chip size="small" label={p.provider} /></TableCell>
-          <TableCell>{p.email ?? "Anonymous"}</TableCell><TableCell><MuiLink component={Link} href={`/prompts/${p.id}`} color="inherit" sx={{ fontWeight: 650 }}>{p.prompt_text ? p.prompt_text.slice(0, 60) : `Prompt #${p.external_prompt_id.slice(0, 8)}`}</MuiLink></TableCell>
+          <TableCell>{p.email ?? "Identity pending"}</TableCell><TableCell><MuiLink component={Link} href={`/prompts/${p.id}`} color="inherit" sx={{ fontWeight: 650 }}>{p.prompt_text ? p.prompt_text.slice(0, 60) : `Legacy prompt #${p.external_prompt_id.slice(0, 8)}`}</MuiLink></TableCell>
           <TableCell><Chip size="small" label={p.model ?? "—"} /></TableCell>
           <TableCell sx={numericCellSx}>{compact(p.context_tokens)}</TableCell><TableCell sx={numericCellSx}>{money(p.cost_usd)}</TableCell>
           <TableCell sx={numericCellSx}>{p.files_read ?? 0}</TableCell><TableCell sx={numericCellSx}>{p.modules ?? 0}</TableCell>

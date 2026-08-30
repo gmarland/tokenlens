@@ -9,7 +9,7 @@ import { homedir } from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
-import { promisify } from "node:util";
+import { parseArgs, promisify } from "node:util";
 import { detectRepository, analyzeRepository } from "@tokenlens/repo-analyzer";
 import type { Provider } from "@tokenlens/shared";
 
@@ -81,21 +81,14 @@ async function config() {
       process.env.TOKENLENS_INGEST_KEY ??
       local.key ??
       claude.env?.TOKENLENS_INGEST_KEY,
-    capture:
-      (process.env.TOKENLENS_CAPTURE_PROMPTS ??
-        (local.capture === undefined
-          ? claude.env?.TOKENLENS_CAPTURE_PROMPTS
-          : local.capture
-            ? "1"
-            : "0")) === "1",
   };
 }
 
-async function persistConfig(endpoint: string, key: string, capture: boolean) {
+async function persistConfig(endpoint: string, key: string) {
   await mkdir(appDir, { recursive: true });
   await writeFile(
     appConfigPath,
-    JSON.stringify({ endpoint, key, capture }, null, 2) + "\n",
+    JSON.stringify({ endpoint, key }, null, 2) + "\n",
     { mode: 0o600 },
   );
 }
@@ -169,7 +162,7 @@ function codexHookEntry(kind: "prompt" | "tool") {
   };
 }
 
-async function installClaude(endpoint: string, key: string, capture: boolean, force: boolean) {
+async function installClaude(endpoint: string, key: string, force: boolean) {
   await mkdir(path.dirname(claudeSettingsPath), { recursive: true });
   const s = await json(claudeSettingsPath);
   const env = s.env ?? {};
@@ -179,12 +172,12 @@ async function installClaude(endpoint: string, key: string, capture: boolean, fo
     );
   await backup(claudeSettingsPath);
   const headers = `Authorization=Bearer%20${encodeURIComponent(key)}`;
+  delete env.TOKENLENS_CAPTURE_PROMPTS;
   s.env = {
     ...env,
     TOKENLENS_INSTALLED: "1",
     TOKENLENS_ENDPOINT: endpoint,
     TOKENLENS_INGEST_KEY: key,
-    TOKENLENS_CAPTURE_PROMPTS: capture ? "1" : "0",
     CLAUDE_CODE_ENABLE_TELEMETRY: "1",
     OTEL_LOGS_EXPORTER: "otlp",
     OTEL_EXPORTER_OTLP_LOGS_PROTOCOL: "http/json",
@@ -236,13 +229,13 @@ function removeExistingOtel(input: string) {
   return out.join("\n").trimEnd() + "\n";
 }
 
-function codexOtelBlock(endpoint: string, key: string, capture: boolean) {
+function codexOtelBlock(endpoint: string, key: string) {
   const target = JSON.stringify(`${endpoint}/api/ingest/otel/v1/logs`);
   const auth = JSON.stringify(`Bearer ${key}`);
-  return `${codexBlockStart}\n[otel]\nenvironment = "tokenlens"\nlog_user_prompt = ${capture}\nexporter = { otlp-http = { endpoint = ${target}, protocol = "json", headers = { Authorization = ${auth} } } }\n${codexBlockEnd}\n`;
+  return `${codexBlockStart}\n[otel]\nenvironment = "tokenlens"\nlog_user_prompt = true\nexporter = { otlp-http = { endpoint = ${target}, protocol = "json", headers = { Authorization = ${auth} } } }\n${codexBlockEnd}\n`;
 }
 
-async function installCodex(endpoint: string, key: string, capture: boolean, force: boolean) {
+async function installCodex(endpoint: string, key: string, force: boolean) {
   await mkdir(path.dirname(codexConfigPath), { recursive: true });
   await mkdir(path.dirname(codexHooksPath), { recursive: true });
   const original = await textFile(codexConfigPath);
@@ -256,7 +249,7 @@ async function installCodex(endpoint: string, key: string, capture: boolean, for
   await backup(codexConfigPath);
   await writeFile(
     codexConfigPath,
-    `${configText.trimEnd()}${configText.trim() ? "\n\n" : ""}${codexOtelBlock(endpoint, key, capture)}`,
+    `${configText.trimEnd()}${configText.trim() ? "\n\n" : ""}${codexOtelBlock(endpoint, key)}`,
     { mode: 0o600 },
   );
 
@@ -278,34 +271,63 @@ async function installCodex(endpoint: string, key: string, capture: boolean, for
   });
 }
 
-function providerArg(args: string[]): Provider | "all" {
-  const i = args.indexOf("--provider");
-  const value = i >= 0 ? args[i + 1] : "claude";
-  if (!(["claude", "codex", "all"] as string[]).includes(value))
-    throw new Error("Use --provider claude|codex|all");
+function providerArg(
+  value: string | undefined,
+  command: string,
+  allowAll = true,
+): Provider | "all" {
+  if (!value)
+    throw new Error(
+      `Use repo-profiler ${command} --provider ${allowAll ? "claude|codex|all" : "claude|codex"}`,
+    );
+  const allowed = allowAll ? ["claude", "codex", "all"] : ["claude", "codex"];
+  if (!allowed.includes(value))
+    throw new Error(`Use --provider ${allowed.join("|")}`);
   return value as Provider | "all";
 }
 
+function endpointArg(value: string | undefined) {
+  if (!value) throw new Error("Use --endpoint <http-or-https-url>");
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new Error(
+      "Invalid --endpoint. Use a plain URL such as http://localhost:3000 (not a Markdown link).",
+    );
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:")
+    throw new Error(
+      "Invalid --endpoint. Only http:// and https:// URLs are supported.",
+    );
+  return value.replace(/\/+$/, "");
+}
+
 async function install(args: string[]) {
-  const endpointValue = args[args.indexOf("--endpoint") + 1];
-  const endpoint =
-    endpointValue && !endpointValue.startsWith("--")
-      ? endpointValue
-      : "http://localhost:3000";
-  const key = args[args.indexOf("--key") + 1];
-  if (!key || key.startsWith("--"))
-    throw new Error("Use --key <workspace-ingest-key>");
-  const force = args.includes("--force");
-  const capture = args.includes("--capture-prompts");
-  const provider = providerArg(args);
-  await persistConfig(endpoint, key, capture);
+  const { values } = parseArgs({
+    args,
+    options: {
+      provider: { type: "string" },
+      endpoint: { type: "string" },
+      key: { type: "string" },
+      force: { type: "boolean", default: false },
+    },
+    strict: true,
+    allowPositionals: false,
+  });
+  const provider = providerArg(values.provider, "install");
+  const endpoint = endpointArg(values.endpoint);
+  const key = values.key;
+  if (!key) throw new Error("Use --key <workspace-ingest-key>");
+  const force = values.force;
+  await persistConfig(endpoint, key);
   if (provider === "claude" || provider === "all")
-    await installClaude(endpoint, key, capture, force);
+    await installClaude(endpoint, key, force);
   if (provider === "codex" || provider === "all")
-    await installCodex(endpoint, key, capture, force);
+    await installCodex(endpoint, key, force);
   await deviceId();
   console.log(
-    `Configured ${provider === "all" ? "Claude Code and Codex" : provider === "codex" ? "Codex" : "Claude Code"} telemetry and hooks (${capture ? "prompt capture ON" : "prompt capture OFF"}).`,
+    `Configured ${provider === "all" ? "Claude Code and Codex" : provider === "codex" ? "Codex" : "Claude Code"} telemetry and hooks for ${endpoint} (prompt capture ON).`,
   );
   if (provider === "codex" || provider === "all")
     console.log("Open /hooks in Codex to review and trust the installed hooks.");
@@ -340,7 +362,13 @@ async function uninstallCodex() {
 }
 
 async function uninstall(args: string[]) {
-  const provider = providerArg(args);
+  const { values } = parseArgs({
+    args,
+    options: { provider: { type: "string" } },
+    strict: true,
+    allowPositionals: false,
+  });
+  const provider = providerArg(values.provider, "uninstall");
   if (provider === "claude" || provider === "all") await uninstallClaude();
   if (provider === "codex" || provider === "all") await uninstallCodex();
   console.log(`Removed TokenLens-owned ${provider} settings.`);
@@ -353,7 +381,6 @@ async function identify(cwd: string) {
 async function promptHook(provider: Provider) {
   try {
     const x = await stdin();
-    const c = await config();
     const r = await identify(x.cwd ?? process.cwd());
     const promptId =
       provider === "codex" ? x.turn_id ?? x.turnId : x.prompt_id ?? x.promptId;
@@ -364,7 +391,7 @@ async function promptHook(provider: Provider) {
       promptId,
       sessionId,
       promptLength: prompt.length,
-      ...(c.capture ? { promptText: prompt } : {}),
+      promptText: prompt,
       model: x.model,
       repoKey: r.repoKey,
       repoName: r.repoName,
@@ -473,7 +500,13 @@ async function scan(
 }
 
 async function doctor(args: string[]) {
-  const provider = providerArg(args);
+  const { values } = parseArgs({
+    args,
+    options: { provider: { type: "string" } },
+    strict: true,
+    allowPositionals: false,
+  });
+  const provider = providerArg(values.provider, "doctor");
   const checks: [string, () => Promise<any>][] = [
     ["Git available", () => exec("git", ["--version"])],
     [
@@ -543,12 +576,22 @@ async function main() {
   if (cmd === "doctor") return doctor(args);
   if (cmd === "scan")
     return scan(sub && !sub.startsWith("--") ? sub : ".");
-  if (cmd === "hook" && sub === "prompt")
-    return promptHook(providerArg(rest) as Provider);
-  if (cmd === "hook" && sub === "tool")
-    return toolHook(providerArg(rest) as Provider);
+  if (cmd === "hook" && (sub === "prompt" || sub === "tool")) {
+    const { values } = parseArgs({
+      args: rest,
+      options: { provider: { type: "string" } },
+      strict: true,
+      allowPositionals: false,
+    });
+    const provider = providerArg(
+      values.provider,
+      `hook ${sub}`,
+      false,
+    ) as Provider;
+    return sub === "prompt" ? promptHook(provider) : toolHook(provider);
+  }
   console.log(
-    "repo-profiler install|uninstall|doctor [--provider claude|codex|all] | scan [path] [--force]",
+    "repo-profiler install --provider claude|codex|all --endpoint <url> --key <key> [--force] | uninstall|doctor --provider claude|codex|all | scan [path] [--force]",
   );
 }
 

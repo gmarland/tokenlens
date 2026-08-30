@@ -4,7 +4,6 @@ import { ingest } from "../../../../lib/http";
 export const POST = (req: any) =>
   ingest(
     req,
-    async (w, b) =>
-      ingestPrompt(w.id, promptHookSchema.parse(b), w.capturePrompts),
+    async (w, b) => ingestPrompt(w.id, promptHookSchema.parse(b)),
     64_000,
   );

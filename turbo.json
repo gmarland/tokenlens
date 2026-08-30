@@ -8,7 +8,7 @@
     },
     "@tokenlens/web#build": {
       "dependsOn": ["^build"],
-      "env": ["CAPTURE_PROMPTS", "NEXT_PUBLIC_DEMO_MODE"],
+      "env": ["NEXT_PUBLIC_DEMO_MODE"],
       "outputs": [".next/**", "!.next/cache/**"]
     },
     "test": {

@@ -43,7 +43,7 @@ export default async function Prompt({ params }: any) {
     <BackLink href={`/repos/${p.repository_id}/prompts`}>← Prompts</BackLink>
     <Eyebrow sx={{ mt: 3 }}>{p.repository_name} · {date(p.started_at)} · {p.provider}</Eyebrow>
     <Typography variant="h1">{p.prompt_text ? p.prompt_text.slice(0, 100) : `Prompt #${p.external_prompt_id.slice(0, 10)}`}</Typography>
-    <Intro>{p.email ?? "Anonymous developer"} · Prompt length {compact(p.prompt_length)} characters · No tool contents are stored.</Intro>
+    <Intro>{p.email ?? "Identity pending"} · Prompt length {compact(p.prompt_length)} characters · No tool contents are stored.</Intro>
     <SectionTitle>Usage</SectionTitle>{cards([
       ["Fresh input", compact(fresh)], ["Cache read", compact(cacheRead)], ["Cache creation", compact(cacheCreate)], ["Output", compact(output)],
       ["Context processed", compact(context)], ["Cost", money(costs.length ? costs.reduce((n: number, x: any) => n + Number(x), 0) : null)], ["Model responses", String(api.length)],

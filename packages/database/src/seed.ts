@@ -24,7 +24,6 @@ workspace = await workspaceRepository.save({
     ...workspace,
     name: "TokenLens demo",
     ingestKeyHash: hashKey(key),
-    capturePrompts: false,
     isDemo: true,
   });
 await database.getRepository(Repository).delete({ workspaceId: workspace.id });
@@ -162,6 +161,7 @@ for (const [ri, spec] of specs.entries()) {
         repositoryId: repo.id,
         snapshotId: activeSnapshot.id,
         promptLength: 80 + Math.round(rnd() * 400),
+        promptText: `Investigate token usage pattern ${promptNo} in ${spec.name} and propose a focused improvement.`,
         model: provider === "codex" ? "gpt-5.6-sol" : "claude-sonnet-4-5",
         branch: "main",
         headSha: activeSnapshot.headSha,

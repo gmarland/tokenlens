@@ -4,6 +4,26 @@ export class InitialSchema2026082900000 implements MigrationInterface {
   name = "InitialSchema2026082900000";
 
   async up(queryRunner: QueryRunner): Promise<void> {
+    const existingTables = await queryRunner.query(`
+      SELECT table_name
+      FROM information_schema.tables
+      WHERE table_schema = current_schema()
+        AND table_name = ANY($1)
+    `, [[
+      "workspaces",
+      "developers",
+      "repositories",
+      "repo_snapshots",
+      "repo_snapshot_files",
+      "prompts",
+      "api_requests",
+      "tool_events",
+    ]]) as unknown as { table_name: string }[];
+    if (existingTables.length === 8) return;
+    if (existingTables.length > 0) {
+      throw new Error("Cannot initialize TypeORM: the TokenLens schema is incomplete");
+    }
+
     await queryRunner.query(`
       CREATE TABLE workspaces (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), name text NOT NULL, ingest_key_hash text NOT NULL UNIQUE, capture_prompts boolean NOT NULL DEFAULT false, is_demo boolean NOT NULL DEFAULT false, created_at timestamptz NOT NULL DEFAULT now());
       CREATE TABLE developers (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), workspace_id uuid NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE, provider text NOT NULL DEFAULT 'claude', external_id text, email text, first_seen_at timestamptz NOT NULL DEFAULT now(), last_seen_at timestamptz NOT NULL DEFAULT now());

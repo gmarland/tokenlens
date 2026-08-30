@@ -58,7 +58,7 @@ async function promptForEvent(workspaceId: string, event: NormalizedAgentEvent) 
   return stub(workspaceId, event.provider, event.promptId, event.sessionId);
 }
 
-export async function ingestPrompt(workspaceId: string, input: PromptHook, capture = false) {
+export async function ingestPrompt(workspaceId: string, input: PromptHook) {
   const source = await db();
   const repositories = source.getRepository(Repository);
   const snapshots = source.getRepository(RepoSnapshot);
@@ -89,7 +89,7 @@ export async function ingestPrompt(workspaceId: string, input: PromptHook, captu
     repositoryId,
     snapshotId,
     promptLength: input.promptLength,
-    promptText: capture ? input.promptText : undefined,
+    promptText: input.promptText,
     model: input.model,
     branch: input.branch,
     headSha: input.headSha,
@@ -143,7 +143,21 @@ export async function ingestOtel(workspaceId: string, events: NormalizedAgentEve
         provider: event.provider,
         externalId: identity,
       });
-      await prompts.update(prompt.id, { developerId: developer.id });
+      const attribution = prompts.createQueryBuilder()
+        .update(Prompt)
+        .set({ developerId: developer.id })
+        .where("workspace_id = :workspaceId", { workspaceId })
+        .andWhere("provider = :provider", { provider: event.provider })
+        .andWhere("developer_id IS NULL");
+      if (event.sessionId) {
+        attribution.andWhere("(id = :promptId OR session_id = :sessionId)", {
+          promptId: prompt.id,
+          sessionId: event.sessionId,
+        });
+      } else {
+        attribution.andWhere("id = :promptId", { promptId: prompt.id });
+      }
+      await attribution.execute();
     }
 
     if (event.kind === "api_request") {

@@ -16,7 +16,6 @@ export class Workspace {
   @PrimaryGeneratedColumn("uuid") id!: string;
   @Column("text") name!: string;
   @Column("text", { name: "ingest_key_hash", unique: true }) ingestKeyHash!: string;
-  @Column("boolean", { name: "capture_prompts", default: false }) capturePrompts!: boolean;
   @Column("boolean", { name: "is_demo", default: false }) isDemo!: boolean;
   @CreateDateColumn({ name: "created_at", type: "timestamptz" }) createdAt!: Date;
 }
