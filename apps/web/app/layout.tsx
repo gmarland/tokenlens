@@ -27,18 +27,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               position="sticky"
               color="default"
               elevation={0}
-              sx={{ borderBottom: 1, borderColor: "divider" }}
+              sx={{ borderBottom: 1, borderColor: "primary.main" }}
             >
-              <Toolbar sx={{ minHeight: "68px !important", width: "100%", maxWidth: 1240, mx: "auto", px: 3 }}>
+              <Toolbar sx={{ minHeight: "72px !important", width: "100%", maxWidth: 1440, mx: "auto", px: { xs: 2.5, sm: 4, md: 8 }, display: "grid", gridTemplateColumns: { xs: "1fr auto", sm: "1fr auto 1fr" } }}>
                 <MuiLink component={Link} href="/" color="inherit" underline="none">
-                  <Typography sx={{ fontFamily: "Georgia, serif", fontSize: 20, fontWeight: 700, letterSpacing: "-.4px" }}>
-                    <Box component="span" color="primary.main">Token</Box>Lens
+                  <Typography sx={{ display: "inline-flex", alignItems: "center", gap: 1.25, fontSize: 18, fontWeight: 800, letterSpacing: "-.035em" }}>
+                    <Box component="span" sx={{ width: 10, height: 10, bgcolor: "secondary.main", border: "1px solid", borderColor: "primary.main" }} />
+                    TokenLens
                   </Typography>
                 </MuiLink>
-                <Box component="nav" sx={{ display: { xs: "none", sm: "flex" }, gap: 2.75, ml: "auto", mr: 3 }}>
-                  <MuiLink component={Link} href="/" color="text.secondary" underline="hover">Repositories</MuiLink>
-                  <MuiLink component={Link} href="/#methodology" color="text.secondary" underline="hover">Methodology</MuiLink>
+                <Box component="nav" sx={{ display: { xs: "none", sm: "flex" }, gap: { sm: 2.5, md: 5 }, justifySelf: "center" }}>
+                  <MuiLink component={Link} href="/" color="inherit" underline="hover" sx={{ fontSize: 13, fontWeight: 800 }}>Repositories</MuiLink>
+                  <MuiLink component={Link} href="/#methodology" color="inherit" underline="hover" sx={{ fontSize: 13, fontWeight: 800 }}>Methodology</MuiLink>
                 </Box>
+                <Typography sx={{ justifySelf: "end", bgcolor: "primary.main", color: "primary.contrastText", px: 1.5, py: 0.75, fontSize: 11, fontWeight: 800 }}>Codebase profiler</Typography>
               </Toolbar>
             </AppBar>
             {children}

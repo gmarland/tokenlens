@@ -21,6 +21,18 @@ const pick = (a: AnyRecord, ...keys: string[]) => {
 const num = (x: any) => Number(x ?? 0) || 0;
 const str = (x: any) => (x == null ? undefined : String(x));
 
+function recordTimeUnixNano(record: AnyRecord): bigint {
+  for (const candidate of [record.timeUnixNano, record.observedTimeUnixNano]) {
+    try {
+      const nanos = BigInt(candidate);
+      if (nanos > 0n) return nanos;
+    } catch {
+      // Try the next timestamp before falling back to receipt time.
+    }
+  }
+  return BigInt(Date.now()) * 1_000_000n;
+}
+
 export type User = {
   externalId?: string;
   accountId?: string;
@@ -87,11 +99,7 @@ function baseFor(
     str(pick(a, "turn.id", "turn_id", "prompt.id", "prompt_id")) ??
     sessionId;
   if (!promptId) return undefined;
-  const rawNanos =
-    record.timeUnixNano ??
-    record.observedTimeUnixNano ??
-    BigInt(Date.now()) * 1_000_000n;
-  const nanos = BigInt(rawNanos);
+  const nanos = recordTimeUnixNano(record);
   return {
     provider,
     promptId,
@@ -106,7 +114,7 @@ function baseFor(
           "response_id",
           "request_id",
         ),
-      ) ?? `${rawNanos}:${fallbackSequence}`,
+      ) ?? `${nanos}:${fallbackSequence}`,
     timestamp: new Date(Number(nanos / 1_000_000n)),
     model: str(pick(a, "model", "gen_ai.request.model")),
     user: {

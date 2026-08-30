@@ -63,7 +63,7 @@ export default async function Home({ searchParams }: {
           </Intro>
         </Box>
         {process.env.NEXT_PUBLIC_DEMO_MODE === "true" && (
-          <Chip label="Synthetic demo data" size="small" sx={{ bgcolor: "#d8f29b", color: "#27451c" }} />
+          <Chip label="Synthetic demo data" size="small" sx={{ bgcolor: "secondary.main", color: "secondary.contrastText", border: "1px solid", borderColor: "primary.main" }} />
         )}
       </Toolbar>
 
@@ -136,7 +136,7 @@ export default async function Home({ searchParams }: {
         )}
       </Panel>
 
-      <Alert id="methodology" severity="warning" variant="outlined" sx={{ mt: 2, bgcolor: "#fff9ee" }}>
+      <Alert id="methodology" severity="warning" variant="outlined" sx={{ mt: 3 }}>
         <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Methodological limitation</Typography>
         <Typography>Token usage is affected by task complexity, developer behaviour, model selection, session history, tools, provider, and repository structure. Correlations shown here identify observed relationships, not causation.</Typography>
       </Alert>

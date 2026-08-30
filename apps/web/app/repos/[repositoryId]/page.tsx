@@ -81,7 +81,7 @@ export default async function Repo({ params, searchParams }: any) {
     </Cards>
     <SectionTitle>Observed relationships</SectionTitle>
     {selected && corr.length ? <Cards compact>{corr.map((c) => <Card variant="outlined" key={c.name}><CardContent>
-      <Label>{c.name} ↔ context processed</Label><Typography sx={{ fontFamily: "Georgia, serif", fontSize: 30, color: "primary.main" }}>ρ = {c.rho!.toFixed(2)}</Typography>
+      <Label>{c.name} ↔ context processed</Label><Typography sx={{ fontSize: 30, fontWeight: 800, letterSpacing: "-.04em", color: "info.main" }}>ρ = {c.rho!.toFixed(2)}</Typography>
       <Typography>{relationship(c.rho!)}</Typography><Label>n = {c.n} prompts · descriptive, not causal</Label>
     </CardContent></Card>)}</Cards> : <Panel><EmptyState>{!selected ? "Select one model; models are not mixed in correlation analysis." : `At least 20 prompts for ${selected} are required before correlations are displayed.`}</EmptyState></Panel>}
   </Page>;

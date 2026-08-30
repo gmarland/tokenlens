@@ -91,6 +91,43 @@ describe("OTLP parser", () => {
     expect(got[0]).not.toHaveProperty("costUsd");
   });
 
+  it("uses the observed timestamp when Codex emits a zero event timestamp", () => {
+    const [got] = parseOtlp({
+      resourceLogs: [{
+        scopeLogs: [{
+          logRecords: [{
+            timeUnixNano: "0",
+            observedTimeUnixNano: "1700000000000000000",
+            attributes: record("codex.user_prompt").attributes,
+          }],
+        }],
+      }],
+    });
+
+    expect(got.timestamp.toISOString()).toBe("2023-11-14T22:13:20.000Z");
+    expect(got.sequence).toBe("1700000000000000000:0");
+  });
+
+  it("uses receipt time when Codex emits no usable timestamp", () => {
+    const before = Date.now();
+    const [got] = parseOtlp({
+      resourceLogs: [{
+        scopeLogs: [{
+          logRecords: [{
+            timeUnixNano: "0",
+            observedTimeUnixNano: "not-a-timestamp",
+            attributes: record("codex.user_prompt").attributes,
+          }],
+        }],
+      }],
+    });
+    const after = Date.now();
+
+    expect(got.timestamp.getTime()).toBeGreaterThanOrEqual(before);
+    expect(got.timestamp.getTime()).toBeLessThanOrEqual(after);
+    expect(got.sequence).not.toBe("0:0");
+  });
+
   it("tolerates optional Claude fields", () =>
     expect(
       parseOtlp({
