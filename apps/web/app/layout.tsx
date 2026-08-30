@@ -1,6 +1,5 @@
 import AppBar from "@mui/material/AppBar";
 import Box from "@mui/material/Box";
-import Chip from "@mui/material/Chip";
 import CssBaseline from "@mui/material/CssBaseline";
 import MuiLink from "@mui/material/Link";
 import Toolbar from "@mui/material/Toolbar";
@@ -40,11 +39,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   <MuiLink component={Link} href="/" color="text.secondary" underline="hover">Repositories</MuiLink>
                   <MuiLink component={Link} href="/#methodology" color="text.secondary" underline="hover">Methodology</MuiLink>
                 </Box>
-                <Chip
-                  size="small"
-                  label="Prompt capture: ON"
-                  sx={{ bgcolor: "text.primary", color: "common.white", fontSize: 11 }}
-                />
               </Toolbar>
             </AppBar>
             {children}
