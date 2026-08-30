@@ -1,6 +1,5 @@
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
-import Chip from "@mui/material/Chip";
 import MuiLink from "@mui/material/Link";
 import Table from "@mui/material/Table";
 import TableBody from "@mui/material/TableBody";
@@ -55,9 +54,6 @@ export default async function Home({ searchParams }: {
             relationships between code structure and context consumption.
           </Intro>
         </Box>
-        {process.env.NEXT_PUBLIC_DEMO_MODE === "true" && (
-          <Chip label="Synthetic demo data" size="small" sx={{ bgcolor: "secondary.main", color: "secondary.contrastText", border: "1px solid", borderColor: "primary.main" }} />
-        )}
       </Toolbar>
 
       <Cards>
@@ -111,7 +107,7 @@ export default async function Home({ searchParams }: {
             </TableBody>
           </Table>
         ) : (
-          <EmptyState>No telemetry yet. Run <Typography component="code" sx={{ fontFamily: "monospace" }}>pnpm demo:seed</Typography> or install the profiler.</EmptyState>
+          <EmptyState>No telemetry yet. Install the profiler to begin collecting repository data.</EmptyState>
         )}
       </ResponsiveTable>
 

@@ -8,7 +8,6 @@
     "test": "turbo run test",
     "test:watch": "vitest",
     "db:migrate": "tsx packages/database/src/migrate.ts",
-    "demo:seed": "tsx packages/database/src/seed.ts",
     "repo-profiler": "repo-profiler"
   },
   "devDependencies": {

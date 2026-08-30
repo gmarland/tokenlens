@@ -25,7 +25,7 @@ export class InitialSchema2026082900000 implements MigrationInterface {
     }
 
     await queryRunner.query(`
-      CREATE TABLE workspaces (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), name text NOT NULL, ingest_key_hash text NOT NULL UNIQUE, capture_prompts boolean NOT NULL DEFAULT false, is_demo boolean NOT NULL DEFAULT false, created_at timestamptz NOT NULL DEFAULT now());
+      CREATE TABLE workspaces (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), name text NOT NULL, ingest_key_hash text NOT NULL UNIQUE, capture_prompts boolean NOT NULL DEFAULT false, created_at timestamptz NOT NULL DEFAULT now());
       CREATE TABLE developers (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), workspace_id uuid NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE, provider text NOT NULL DEFAULT 'claude', external_id text, email text, first_seen_at timestamptz NOT NULL DEFAULT now(), last_seen_at timestamptz NOT NULL DEFAULT now());
       CREATE INDEX developer_workspace_idx ON developers(workspace_id);
       CREATE UNIQUE INDEX developer_workspace_provider_external_uq ON developers(workspace_id, provider, external_id);

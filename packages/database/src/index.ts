@@ -4,6 +4,7 @@ import { entities } from "./entities";
 import { InitialSchema2026082900000 } from "./migrations/2026082900000-InitialSchema";
 import { AlwaysCapturePrompts2026083000000 } from "./migrations/2026083000000-AlwaysCapturePrompts";
 import { UpgradeLegacySchema2026083000010 } from "./migrations/2026083000010-UpgradeLegacySchema";
+import { RemoveDemoData2026083000020 } from "./migrations/2026083000020-RemoveDemoData";
 
 export const dataSource = new DataSource({
   type: "postgres",
@@ -13,6 +14,7 @@ export const dataSource = new DataSource({
     InitialSchema2026082900000,
     AlwaysCapturePrompts2026083000000,
     UpgradeLegacySchema2026083000010,
+    RemoveDemoData2026083000020,
   ],
   migrationsRun: false,
   migrationsTableName: "typeorm_migrations",

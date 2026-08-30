@@ -6,9 +6,6 @@ consumption. It combines privacy-preserving agent telemetry with local static
 repository analysis; it is not a generic usage dashboard or an employee
 productivity score.
 
-> Demo data is synthetic and exists only to exercise the product. Correlations
-> in demo mode are not research findings.
-
 ## Architecture
 
 ```text
@@ -33,7 +30,6 @@ cp .env.example .env
 pnpm install
 docker compose up -d
 pnpm db:migrate
-pnpm demo:seed
 pnpm test
 pnpm dev
 ```

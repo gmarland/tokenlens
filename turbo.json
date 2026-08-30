@@ -8,7 +8,6 @@
     },
     "@tokenlens/web#build": {
       "dependsOn": ["^build"],
-      "env": ["NEXT_PUBLIC_DEMO_MODE"],
       "outputs": [".next/**", "!.next/cache/**"]
     },
     "@tokenlens/ingest-api#build": {

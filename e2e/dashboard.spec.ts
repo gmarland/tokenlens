@@ -1,1 +1,7 @@
-import{test,expect}from"@playwright/test";test("repository to prompt workflow",async({page})=>{await page.goto("/");await expect(page.getByRole("columnheader",{name:"Source files"})).toBeVisible();const repo=page.locator("tbody a").first();await expect(repo).toBeVisible();await repo.click();await expect(page.getByRole("heading",{name:"Observed relationships",exact:true})).toBeVisible();await page.getByText("Explore prompts").click();const prompt=page.locator("tbody a").first();await expect(prompt).toContainText("Investigate token usage pattern");await prompt.click();await expect(page.getByRole("heading",{name:"Working set"})).toBeVisible();await expect(page.getByRole("heading",{name:"Timeline"})).toBeVisible()});
+import { expect, test } from "@playwright/test";
+
+test("shows setup guidance before telemetry is collected", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Repository context, made visible." })).toBeVisible();
+  await expect(page.getByText("No telemetry yet. Install the profiler to begin collecting repository data.")).toBeVisible();
+});
