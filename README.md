@@ -13,16 +13,16 @@ productivity score.
 
 ```text
 Claude/Codex hooks ── repo, provider, turn ID, relative file paths ─┐
-Claude/Codex OTLP ─── tokens, model, API and tool events ──────────┼─> Next.js ingestion ─> PostgreSQL
-Local profiler ────── snapshot and file metrics ──────────────────┘                         │
-                                                                                           v
-Repository structure <──────── analytics + file attribution <──────────────── Dashboard
+Claude/Codex OTLP ─── tokens, model, API and tool events ──────────┼─> Ingestion API ─> PostgreSQL
+Local profiler ────── snapshot and file metrics ──────────────────┘                    │
+                                                                                      v
+Repository structure <──────── analytics + file attribution <────────── Next.js dashboard
 ```
 
 The CLI never proxies agent traffic, reads transcript files, or uploads source
-contents. Next.js route handlers authenticate and validate requests, then call
-package-level ingestion services. Events are idempotent and can arrive in any
-order.
+contents. The standalone ingestion API authenticates and validates requests,
+then calls the same package-level database code used by the website API. Events
+are idempotent and can arrive in any order.
 
 ## Local setup
 
@@ -32,12 +32,14 @@ Use the current Node.js LTS and pnpm:
 cp .env.example .env
 pnpm install
 docker compose up -d
+pnpm db:migrate
 pnpm demo:seed
 pnpm test
 pnpm dev
 ```
 
-Open <http://localhost:3000>. The default development ingest key is
+Open the dashboard at <http://localhost:3000>. The ingestion API runs at
+<http://localhost:3001>. The default development ingest key is
 `development-key-change-me`; replace it outside local development.
 
 ## Agent setup
@@ -46,8 +48,8 @@ Install the package so `repo-profiler` is on `PATH`, then choose one provider or
 install both:
 
 ```bash
-repo-profiler install --provider claude --endpoint http://localhost:3000 --key development-key-change-me
-repo-profiler install --provider codex --endpoint http://localhost:3000 --key development-key-change-me
+repo-profiler install --provider claude --endpoint http://localhost:3001 --key development-key-change-me
+repo-profiler install --provider codex --endpoint http://localhost:3001 --key development-key-change-me
 # or: repo-profiler install --provider all ...
 ```
 
@@ -55,7 +57,7 @@ When invoking the repository's npm script instead of a globally installed
 binary, include npm's `--` argument separator and use a plain URL:
 
 ```bash
-npm run repo-profiler -- install --provider codex --endpoint http://localhost:3000 --key development-key-change-me
+npm run repo-profiler -- install --provider codex --endpoint http://localhost:3001 --key development-key-change-me
 ```
 
 For Codex, open `/hooks` once after installation and review and trust the two
@@ -122,9 +124,9 @@ pnpm turbo build --filter=@tokenlens/web
 pnpm exec playwright test
 ```
 
-The backend runs pending TypeORM migrations automatically when it first connects
-to PostgreSQL. `pnpm db:migrate` is available for deployments that want to apply
-them before starting the application.
+Run `pnpm db:migrate` before starting either application. Migrations are kept out
+of application startup so independently starting the website and ingestion API
+cannot race to apply the same database changes.
 
 ## Troubleshooting
 

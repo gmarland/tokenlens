@@ -2,7 +2,10 @@ import { defineConfig } from "vitest/config";
 import { resolve } from "node:path";
 
 export default defineConfig({
-  test: { include: ["packages/**/*.test.ts"], environment: "node" },
+  test: {
+    include: ["packages/**/*.test.ts", "apps/**/*.test.ts"],
+    environment: "node",
+  },
   resolve: {
     alias: {
       "@tokenlens/shared": resolve(__dirname, "packages/shared/src"),

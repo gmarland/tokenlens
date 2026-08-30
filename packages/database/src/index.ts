@@ -3,13 +3,18 @@ import { DataSource } from "typeorm";
 import { entities } from "./entities";
 import { InitialSchema2026082900000 } from "./migrations/2026082900000-InitialSchema";
 import { AlwaysCapturePrompts2026083000000 } from "./migrations/2026083000000-AlwaysCapturePrompts";
+import { UpgradeLegacySchema2026083000010 } from "./migrations/2026083000010-UpgradeLegacySchema";
 
 export const dataSource = new DataSource({
   type: "postgres",
   url: process.env.DATABASE_URL ?? "postgres://tokenlens:tokenlens@localhost:5432/tokenlens",
   entities,
-  migrations: [InitialSchema2026082900000, AlwaysCapturePrompts2026083000000],
-  migrationsRun: true,
+  migrations: [
+    InitialSchema2026082900000,
+    AlwaysCapturePrompts2026083000000,
+    UpgradeLegacySchema2026083000010,
+  ],
+  migrationsRun: false,
   migrationsTableName: "typeorm_migrations",
   synchronize: false,
 });

@@ -11,6 +11,10 @@
       "env": ["NEXT_PUBLIC_DEMO_MODE"],
       "outputs": [".next/**", "!.next/cache/**"]
     },
+    "@tokenlens/ingest-api#build": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
     "test": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/vitest.config.ts"]

@@ -3,7 +3,7 @@
   "private": true,
   "packageManager": "pnpm@10.17.1",
   "scripts": {
-    "dev": "turbo run dev --filter=@tokenlens/web",
+    "dev": "turbo run dev --filter=@tokenlens/web --filter=@tokenlens/ingest-api",
     "build": "turbo run build",
     "test": "turbo run test",
     "test:watch": "vitest",
