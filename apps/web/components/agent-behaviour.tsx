@@ -11,14 +11,12 @@ import Tabs from "@mui/material/Tabs";
 import { SeriesTrend, Trend } from "./charts";
 import { EmptyState } from "./ui";
 import {
-  buildUserTrendSeries,
+  buildBehaviourTrendSeries,
   groupBehaviourPrompts,
   type AgentBehaviourPrompt,
   type BehaviourDimension,
   type BehaviourGroup,
 } from "./agent-behaviour-data";
-
-const ALL_USERS_KEY = "user:all";
 
 function GroupTrend({
   dimension,
@@ -29,8 +27,10 @@ function GroupTrend({
   groups: BehaviourGroup[];
   prompts: AgentBehaviourPrompt[];
 }) {
-  const options = dimension === "user" && prompts.length
-    ? [{ key: ALL_USERS_KEY, label: "All users", prompts }, ...groups]
+  const allKey = `${dimension}:all`;
+  const allLabel = dimension === "branch" ? "All branches" : "All users";
+  const options = prompts.length
+    ? [{ key: allKey, label: allLabel, prompts }, ...groups]
     : groups;
   const [selected, setSelected] = useState(options[0]?.key ?? "");
   const group = options.find((candidate) => candidate.key === selected) ?? options[0];
@@ -38,9 +38,9 @@ function GroupTrend({
 
   if (!group) return <EmptyState>No {dimension === "branch" ? "branch" : "user"} data matches these filters.</EmptyState>;
 
-  const visibleUsers = dimension === "user"
-    ? group.key === ALL_USERS_KEY ? groups : groups.filter((user) => user.key === group.key)
-    : [];
+  const visibleGroups = group.key === allKey
+    ? groups
+    : groups.filter((candidate) => candidate.key === group.key);
 
   return <>
     <FormControl size="small" sx={{ minWidth: { xs: "100%", sm: 280 }, mt: 2.5 }}>
@@ -56,22 +56,16 @@ function GroupTrend({
         </MenuItem>)}
       </Select>
     </FormControl>
-    {dimension === "user" ? <>
-      <SeriesTrend
-        dates={group.prompts.map((prompt) => prompt.date)}
-        series={buildUserTrendSeries(group.prompts, visibleUsers, "context")}
-        label="Context tokens"
-      />
-      <SeriesTrend
-        dates={group.prompts.map((prompt) => prompt.date)}
-        series={buildUserTrendSeries(group.prompts, visibleUsers, "files")}
-        label="Files read"
-      />
-    </> : <Trend
-      data={group.prompts}
-      keys={["context", "files"]}
-      labels={{ context: "Context tokens", files: "Files read" }}
-    />}
+    <SeriesTrend
+      dates={group.prompts.map((prompt) => prompt.date)}
+      series={buildBehaviourTrendSeries(group.prompts, visibleGroups, "context")}
+      label="Context tokens"
+    />
+    <SeriesTrend
+      dates={group.prompts.map((prompt) => prompt.date)}
+      series={buildBehaviourTrendSeries(group.prompts, visibleGroups, "files")}
+      label="Files read"
+    />
   </>;
 }
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   agentBehaviourUserLabel,
-  buildUserTrendSeries,
+  buildBehaviourTrendSeries,
   groupBehaviourPrompts,
   type AgentBehaviourPrompt,
 } from "./agent-behaviour-data";
@@ -69,7 +69,7 @@ describe("agentBehaviourUserLabel", () => {
   });
 });
 
-describe("buildUserTrendSeries", () => {
+describe("buildBehaviourTrendSeries", () => {
   it("creates a separate, labelled line for each user", () => {
     const prompts = [
       prompt({ id: "1", context: 100, developerId: "developer-1", developerLabel: "one@example.com" }),
@@ -78,9 +78,23 @@ describe("buildUserTrendSeries", () => {
     ];
     const users = groupBehaviourPrompts(prompts, "user");
 
-    expect(buildUserTrendSeries(prompts, users, "context")).toEqual([
+    expect(buildBehaviourTrendSeries(prompts, users, "context")).toEqual([
       { id: "user:developer-1", label: "one@example.com", data: [100, null, 300] },
       { id: "user:developer-2", label: "two@example.com", data: [null, 200, null] },
+    ]);
+  });
+
+  it("creates a separate, labelled line for each branch", () => {
+    const prompts = [
+      prompt({ id: "1", branch: "main", files: 2 }),
+      prompt({ id: "2", branch: "feature", files: 4 }),
+      prompt({ id: "3", branch: "main", files: 6 }),
+    ];
+    const branches = groupBehaviourPrompts(prompts, "branch");
+
+    expect(buildBehaviourTrendSeries(prompts, branches, "files")).toEqual([
+      { id: "branch:main", label: "main", data: [2, null, 6] },
+      { id: "branch:feature", label: "feature", data: [null, 4, null] },
     ]);
   });
 });

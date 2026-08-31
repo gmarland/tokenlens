@@ -52,17 +52,17 @@ export function groupBehaviourPrompts(
     b.prompts.length - a.prompts.length || a.label.localeCompare(b.label));
 }
 
-export function buildUserTrendSeries(
+export function buildBehaviourTrendSeries(
   prompts: AgentBehaviourPrompt[],
-  users: BehaviourGroup[],
+  groups: BehaviourGroup[],
   metric: BehaviourMetric,
 ): BehaviourTrendSeries[] {
-  return users.map((user) => {
-    const userPromptIds = new Set(user.prompts.map((prompt) => prompt.id));
+  return groups.map((group) => {
+    const groupPromptIds = new Set(group.prompts.map((prompt) => prompt.id));
     return {
-      id: user.key,
-      label: user.label,
-      data: prompts.map((prompt) => userPromptIds.has(prompt.id) ? prompt[metric] : null),
+      id: group.key,
+      label: group.label,
+      data: prompts.map((prompt) => groupPromptIds.has(prompt.id) ? prompt[metric] : null),
     };
   });
 }
