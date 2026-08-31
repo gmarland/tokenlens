@@ -4,8 +4,8 @@ import CardContent from "@mui/material/CardContent";
 import Typography from "@mui/material/Typography";
 import { correlations, median, relationship } from "@tokenlens/analytics";
 import { notFound } from "next/navigation";
-import { AgentBehaviour } from "../../../components/agent-behaviour";
 import { AnalysisFilters } from "../../../components/filters";
+import { RepositoryTimelines } from "../../../components/repository-timelines";
 import { BackLink, Cards, EmptyState, Eyebrow, Intro, Label, MetricCard, Page, Panel, SectionTitle, StatCard, Toolbar } from "../../../components/ui";
 import { repository } from "../../../lib/data";
 import { compact, duration } from "../../../lib/format";
@@ -19,6 +19,7 @@ export default async function Repo({ params, searchParams }: any) {
   if (!data) notFound();
   const rs = data.prompts;
   const s = data.repo.snapshot ?? {};
+  const latestStructure = data.snapshots.at(-1);
   const scope = `${q.provider ?? "all providers"} · ${q.model ?? "all models"}`;
   const nums = (k: string) => rs.map((x: any) => Number(x[k] ?? 0));
   const corr = correlations(rs, (x: any) => Number(x.context_tokens), {
@@ -52,14 +53,14 @@ export default async function Repo({ params, searchParams }: any) {
     </Toolbar>
     <Cards>
       <MetricCard label="Source LOC" value={compact(s.total_source_loc)} /><MetricCard label="Source files" value={compact(s.source_files)} />
-      <MetricCard label="Packages" value={compact(s.package_count)} /><MetricCard label="Prompts" value={compact(rs.length)} />
+      <MetricCard label="Modules" value={compact(latestStructure?.modules)} /><MetricCard label="Packages" value={compact(s.package_count)} /><MetricCard label="Prompts" value={compact(rs.length)} />
       <MetricCard label="Median context / prompt" value={compact(median(nums("context_tokens")))} />
       <MetricCard label="Median files read" value={median(nums("files_read")).toFixed(1)} />
       <MetricCard label="Median time to first edit" value={duration(median(rs.filter((x: any) => x.first_edit).map((x: any) => +new Date(x.first_edit) - +new Date(x.started_at))))} />
     </Cards>
-    <Toolbar><SectionTitle>Agent behaviour</SectionTitle><BackLink href={`/repos/${id}/prompts${promptQuery.size ? `?${promptQuery}` : ""}`}>Explore prompts →</BackLink></Toolbar>
-    <Panel><AgentBehaviour
-      key={`${q.provider ?? ""}:${q.model ?? ""}`}
+    <RepositoryTimelines
+      behaviourKey={`${q.provider ?? ""}:${q.model ?? ""}`}
+      promptHref={`/repos/${id}/prompts${promptQuery.size ? `?${promptQuery}` : ""}`}
       prompts={rs.map((x: any) => ({
         id: x.id,
         startedAt: new Date(x.started_at).toISOString(),
@@ -69,7 +70,8 @@ export default async function Repo({ params, searchParams }: any) {
         developerId: x.developer_id,
         developerLabel: x.email,
       }))}
-    /></Panel>
+      snapshots={data.snapshots}
+    />
     <SectionTitle>Repository structure</SectionTitle>
     <Cards compact>
       <StatCard label="File LOC median / p95 / max" value={`${compact(s.median_file_loc)} / ${compact(s.p95_file_loc)} / ${compact(s.max_file_loc)}`} />

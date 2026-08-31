@@ -66,22 +66,35 @@ export function filterBehaviourPromptsByRange(
   prompts: AgentBehaviourPrompt[],
   range: TimeRange,
   customRange: CustomTimeRange | null = null,
+  referenceTimestamp?: string,
 ) {
-  if (range === "all" || !prompts.length) return prompts;
+  return filterByTimeRange(prompts, (prompt) => prompt.startedAt, range, customRange, referenceTimestamp);
+}
+
+export function filterByTimeRange<T>(
+  items: T[],
+  timestamp: (item: T) => string,
+  range: TimeRange,
+  customRange: CustomTimeRange | null = null,
+  referenceTimestamp?: string,
+) {
+  if (range === "all" || !items.length) return items;
 
   if (range === "custom") {
-    if (!customRange) return prompts;
+    if (!customRange) return items;
     const start = Date.parse(`${customRange.start}T00:00:00.000Z`);
     const end = Date.parse(`${customRange.end}T23:59:59.999Z`);
-    return prompts.filter((prompt) => {
-      const timestamp = Date.parse(prompt.startedAt);
-      return timestamp >= start && timestamp <= end;
+    return items.filter((item) => {
+      const value = Date.parse(timestamp(item));
+      return value >= start && value <= end;
     });
   }
 
-  const latestTimestamp = Math.max(...prompts.map((prompt) => Date.parse(prompt.startedAt)));
+  const latestTimestamp = referenceTimestamp
+    ? Date.parse(referenceTimestamp)
+    : Math.max(...items.map((item) => Date.parse(timestamp(item))));
   const cutoff = latestTimestamp - timeRangeMilliseconds[range];
-  return prompts.filter((prompt) => Date.parse(prompt.startedAt) >= cutoff);
+  return items.filter((item) => Date.parse(timestamp(item)) >= cutoff);
 }
 
 export function agentBehaviourUserLabel(prompt: AgentBehaviourPrompt) {

@@ -24,6 +24,7 @@ export function SeriesTrend({
   timestamps,
   series,
   label,
+  timestampValueFormatter,
   highlightedAxis,
   onHighlightedAxisChange,
   highlightedItem,
@@ -32,6 +33,7 @@ export function SeriesTrend({
   timestamps: string[];
   series: Array<{ id: string; label: string; data: Array<number | null> }>;
   label: string;
+  timestampValueFormatter?: (timestamp: string, location: "tick" | "tooltip") => string;
   highlightedAxis: AxisItemIdentifier[];
   onHighlightedAxisChange: (axis: AxisItemIdentifier[]) => void;
   highlightedItem: LineItemIdentifier | null;
@@ -48,9 +50,11 @@ export function SeriesTrend({
         data: dates,
         scaleType: "time",
         tickLabelMinGap: 36,
-        valueFormatter: (value: Date, context) => context.location === "tick"
-          ? value.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
-          : value.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "medium" }),
+        valueFormatter: (value: Date, context) => timestampValueFormatter
+          ? timestampValueFormatter(value.toISOString(), context.location === "tick" ? "tick" : "tooltip")
+          : context.location === "tick"
+            ? value.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
+            : value.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "medium" }),
       }]}
       yAxis={[{ label }]}
       axisHighlight={{ x: "line" }}

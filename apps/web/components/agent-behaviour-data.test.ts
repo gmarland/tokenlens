@@ -195,4 +195,13 @@ describe("filterBehaviourPromptsByRange", () => {
   it("does not filter custom ranges until dates have been applied", () => {
     expect(filterBehaviourPromptsByRange(prompts, "custom", null)).toBe(prompts);
   });
+
+  it("uses a shared reference timestamp for relative ranges", () => {
+    expect(filterBehaviourPromptsByRange(
+      prompts,
+      "7d",
+      null,
+      "2026-09-07T12:00:00.000Z",
+    ).map((item) => item.id)).toEqual(["latest"]);
+  });
 });
