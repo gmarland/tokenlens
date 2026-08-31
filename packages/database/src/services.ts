@@ -5,6 +5,7 @@ import {
   Prompt,
   RepoSnapshot,
   RepoSnapshotFile,
+  RepoCommit,
   Repository,
   ToolEvent,
   ToolFileAccess,
@@ -367,6 +368,22 @@ export async function ingestSnapshot(workspaceId: string, input: SnapshotUpload)
   if (input.files.length) {
     await source.getRepository(RepoSnapshotFile).createQueryBuilder().insert()
       .values(input.files.map((file) => ({ snapshotId: snapshot.id, ...file })))
+      .orIgnore().execute();
+  }
+  if (input.commits.length) {
+    await source.getRepository(RepoCommit).createQueryBuilder().insert()
+      .values(input.commits.map((commit) => ({
+        repositoryId: repository.id,
+        sha: commit.sha,
+        authorName: commit.authorName,
+        authorEmail: commit.authorEmail,
+        authoredAt: new Date(commit.authoredAt),
+        committerName: commit.committerName,
+        committerEmail: commit.committerEmail,
+        committedAt: new Date(commit.committedAt),
+        observedBranch: input.branch,
+        firstObservedAt: new Date(input.capturedAt),
+      })))
       .orIgnore().execute();
   }
   await source.getRepository(Prompt).createQueryBuilder().update()

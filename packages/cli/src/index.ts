@@ -462,10 +462,13 @@ async function scan(
   fromHook = false,
   known?: Awaited<ReturnType<typeof detectRepository>>,
 ) {
+  const commitCaptureVersion = 1;
   const r = known ?? (await identify(path.resolve(input)));
   const cacheFile = path.join(appDir, "cache.json");
   const cache = await json(cacheFile, { snapshots: [] });
-  if (cache.snapshots.includes(r.fingerprint) && !process.argv.includes("--force"))
+  if (cache.snapshots.includes(r.fingerprint)
+    && cache.commitCaptureVersion === commitCaptureVersion
+    && !process.argv.includes("--force"))
     return;
   const analysis = await analyzeRepository(r.root);
   await post("/api/ingest/snapshot", {
@@ -482,11 +485,12 @@ async function scan(
     ...analysis,
   });
   cache.snapshots = [...new Set([...cache.snapshots, r.fingerprint])].slice(-100);
+  cache.commitCaptureVersion = commitCaptureVersion;
   await mkdir(appDir, { recursive: true });
   await writeFile(cacheFile, JSON.stringify(cache), { mode: 0o600 });
   if (!fromHook)
     console.log(
-      `Uploaded ${analysis.metrics.sourceFiles} source files and ${analysis.metrics.totalSourceLoc} LOC; no source content was sent.`,
+      `Uploaded ${analysis.metrics.sourceFiles} source files, ${analysis.metrics.totalSourceLoc} LOC, and ${analysis.commits.length} commit identities; no source content or commit messages were sent.`,
     );
 }
 

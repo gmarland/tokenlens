@@ -9,6 +9,7 @@ import { ReconcileCodexUsage2026083000030 } from "./migrations/2026083000030-Rec
 import { ToolEventProvenance2026083100000 } from "./migrations/2026083100000-ToolEventProvenance";
 import { CacheMetricAvailability2026083100010 } from "./migrations/2026083100010-CacheMetricAvailability";
 import { ToolFileAccesses2026083100020 } from "./migrations/2026083100020-ToolFileAccesses";
+import { RepoCommits2026083100030 } from "./migrations/2026083100030-RepoCommits";
 
 export const dataSource = new DataSource({
   type: "postgres",
@@ -23,6 +24,7 @@ export const dataSource = new DataSource({
     ToolEventProvenance2026083100000,
     CacheMetricAvailability2026083100010,
     ToolFileAccesses2026083100020,
+    RepoCommits2026083100030,
   ],
   migrationsRun: false,
   migrationsTableName: "typeorm_migrations",

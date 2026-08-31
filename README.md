@@ -83,14 +83,15 @@ developer who owns the session.
 
 The server receives provider, prompt/session identifiers, prompt text and
 character length, available developer identity, normalized Git remote identity,
-branch/commit/dirty state, relative file paths, token totals, model and tool
-metadata, and repository/file structural metrics.
+branch/commit/dirty state, commit author and committer identities and timestamps,
+relative file paths, token totals, model and tool metadata, and repository/file
+structural metrics.
 
 It does **not** receive assistant responses, source contents, tool output, search
-patterns, matched text, raw terminal output, credentials from Git remotes, or
-absolute local paths. Source and dependency analysis happens locally. Ingest
-routes require a bearer secret; only its SHA-256 digest is stored in PostgreSQL.
-Payloads are size-limited and relative paths reject traversal.
+patterns, matched text, commit messages, raw terminal output, credentials from
+Git remotes, or absolute local paths. Source and dependency analysis happens
+locally. Ingest routes require a bearer secret; only its SHA-256 digest is stored
+in PostgreSQL. Payloads are size-limited and relative paths reject traversal.
 
 Codex plan usage does not expose a comparable per-turn dollar cost, so TokenLens
 records Codex cost as unavailable. OpenAI cache reads and writes are normalized

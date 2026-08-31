@@ -24,9 +24,21 @@ describe("repository structure history", () => {
         captured_at: new Date("2026-08-30T12:00:00.000Z"),
         branch: "main",
         head_sha: "abcdef123456",
+        dirty: false,
         total_source_loc: "12500",
         source_files: 84,
         modules: "7",
+      }])
+      .mockResolvedValueOnce([{
+        sha: "a".repeat(40),
+        author_name: "Ada Author",
+        author_email: "ada@example.com",
+        authored_at: new Date("2026-08-30T10:00:00.000Z"),
+        committer_name: "Chris Committer",
+        committer_email: "chris@example.com",
+        committed_at: new Date("2026-08-30T11:00:00.000Z"),
+        observed_branch: "main",
+        first_observed_at: new Date("2026-08-30T12:00:00.000Z"),
       }])
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([])
@@ -39,12 +51,21 @@ describe("repository structure history", () => {
       capturedAt: "2026-08-30T12:00:00.000Z",
       branch: "main",
       headSha: "abcdef123456",
+      dirty: false,
       totalSourceLoc: 12500,
       sourceFiles: 84,
       modules: 7,
     }]);
+    expect(result?.commits[0]).toMatchObject({
+      sha: "a".repeat(40),
+      authorName: "Ada Author",
+      committerName: "Chris Committer",
+      committedAt: "2026-08-30T11:00:00.000Z",
+    });
     expect(queryMock.mock.calls[1][0]).toContain("count(distinct nullif(f.module_name,''))::int modules");
     expect(queryMock.mock.calls[1][0]).toContain("order by s.captured_at,s.id");
     expect(queryMock.mock.calls[1][1]).toEqual(["repo-1"]);
+    expect(queryMock.mock.calls[2][0]).toContain("from repo_commits");
+    expect(queryMock.mock.calls[2][1]).toEqual(["repo-1"]);
   });
 });

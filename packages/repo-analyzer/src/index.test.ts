@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { normalizeRemote, analyzeRepository } from "./index";
+import { normalizeRemote, analyzeCommits, analyzeRepository } from "./index";
 import { mkdtemp, cp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -39,5 +39,38 @@ describe("repository analysis", () => {
     expect(x.metrics.dependencyGraphEdges).toBe(2);
     expect(x.metrics.dependencyCycleCount).toBe(1);
     expect(x.files.every((f) => f.inDependencyCycle)).toBe(true);
+  });
+});
+
+describe("commit analysis", () => {
+  it("captures author and committer identities without commit messages", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "tokenlens-commits-"));
+    await exec("git", ["init", "-q", root]);
+    await writeFile(path.join(root, "index.ts"), "export const value = 1;\n");
+    await exec("git", ["-C", root, "add", "."]);
+    await exec("git", ["-C", root, "commit", "-q", "-m", "private message"], {
+      env: {
+        ...process.env,
+        GIT_AUTHOR_NAME: "Ada Author",
+        GIT_AUTHOR_EMAIL: "ada@example.com",
+        GIT_AUTHOR_DATE: "2026-08-30T10:00:00Z",
+        GIT_COMMITTER_NAME: "Chris Committer",
+        GIT_COMMITTER_EMAIL: "chris@example.com",
+        GIT_COMMITTER_DATE: "2026-08-30T11:00:00Z",
+      },
+    });
+
+    const commits = await analyzeCommits(root);
+
+    expect(commits).toHaveLength(1);
+    expect(commits[0]).toMatchObject({
+      authorName: "Ada Author",
+      authorEmail: "ada@example.com",
+      authoredAt: "2026-08-30T10:00:00.000Z",
+      committerName: "Chris Committer",
+      committerEmail: "chris@example.com",
+      committedAt: "2026-08-30T11:00:00.000Z",
+    });
+    expect(commits[0]).not.toHaveProperty("message");
   });
 });

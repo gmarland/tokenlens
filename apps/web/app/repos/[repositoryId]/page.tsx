@@ -71,6 +71,7 @@ export default async function Repo({ params, searchParams }: any) {
         developerLabel: x.email,
       }))}
       snapshots={data.snapshots}
+      commits={data.commits}
     />
     <SectionTitle>Repository structure</SectionTitle>
     <Cards compact>

@@ -3,18 +3,20 @@
 import { AgentBehaviour } from "./agent-behaviour";
 import type { AgentBehaviourPrompt } from "./agent-behaviour-data";
 import { RepositoryStructureTrend } from "./repository-structure-trend";
-import type { RepositoryStructureSnapshot } from "./repository-structure-data";
+import type { RepositoryCommit, RepositoryStructureSnapshot } from "./repository-structure-data";
 import { RepositoryTimeFilterProvider } from "./repository-time-filters";
 import { BackLink, Panel, SectionTitle, Toolbar } from "./ui";
 
 export function RepositoryTimelines({
   prompts,
   snapshots,
+  commits,
   promptHref,
   behaviourKey,
 }: {
   prompts: AgentBehaviourPrompt[];
   snapshots: RepositoryStructureSnapshot[];
+  commits: RepositoryCommit[];
   promptHref: string;
   behaviourKey: string;
 }) {
@@ -25,7 +27,7 @@ export function RepositoryTimelines({
     </RepositoryTimeFilterProvider>
     <RepositoryTimeFilterProvider key="structure" timestamps={snapshots.map((snapshot) => snapshot.capturedAt)}>
       <SectionTitle>Repository structure over time</SectionTitle>
-      <Panel><RepositoryStructureTrend snapshots={snapshots} /></Panel>
+      <Panel><RepositoryStructureTrend snapshots={snapshots} commits={commits} /></Panel>
     </RepositoryTimeFilterProvider>
   </>;
 }

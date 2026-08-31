@@ -8,6 +8,7 @@ vi.mock("./index", () => ({
   Prompt: class Prompt {},
   RepoSnapshot: class RepoSnapshot {},
   RepoSnapshotFile: class RepoSnapshotFile {},
+  RepoCommit: class RepoCommit {},
   Repository: class Repository {},
   ToolEvent: class ToolEvent {},
   ToolFileAccess: class ToolFileAccess {},

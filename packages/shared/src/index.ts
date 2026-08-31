@@ -62,6 +62,16 @@ export const fileMetricSchema = z.object({
   inDependencyCycle: z.boolean(),
 });
 
+export const repoCommitSchema = z.object({
+  sha: z.string().regex(/^[0-9a-f]{40,64}$/i),
+  authorName: z.string().max(500),
+  authorEmail: z.string().max(500),
+  authoredAt: z.string().datetime(),
+  committerName: z.string().max(500),
+  committerEmail: z.string().max(500),
+  committedAt: z.string().datetime(),
+});
+
 export const snapshotSchema = z.object({
   repoKey: z.string(),
   repoName: z.string(),
@@ -75,6 +85,7 @@ export const snapshotSchema = z.object({
   capturedAt: z.string().datetime(),
   metrics: z.record(z.string(), z.unknown()),
   files: z.array(fileMetricSchema).max(100000),
+  commits: z.array(repoCommitSchema).max(500).default([]),
 });
 
 export type PromptHook = z.infer<typeof promptHookSchema>;

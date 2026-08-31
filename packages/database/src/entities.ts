@@ -118,6 +118,23 @@ export class RepoSnapshotFile {
   @Column("boolean", { name: "in_dependency_cycle" }) inDependencyCycle!: boolean;
 }
 
+@Entity("repo_commits")
+@Index("repo_commit_repository_sha_uq", ["repositoryId", "sha"], { unique: true })
+@Index("repo_commit_repository_committed_idx", ["repositoryId", "committedAt"])
+export class RepoCommit {
+  @PrimaryGeneratedColumn("uuid") id!: string;
+  @Column("uuid", { name: "repository_id" }) repositoryId!: string;
+  @Column("text") sha!: string;
+  @Column("text", { name: "author_name" }) authorName!: string;
+  @Column("text", { name: "author_email" }) authorEmail!: string;
+  @Column("timestamptz", { name: "authored_at" }) authoredAt!: Date;
+  @Column("text", { name: "committer_name" }) committerName!: string;
+  @Column("text", { name: "committer_email" }) committerEmail!: string;
+  @Column("timestamptz", { name: "committed_at" }) committedAt!: Date;
+  @Column("text", { name: "observed_branch" }) observedBranch!: string;
+  @Column("timestamptz", { name: "first_observed_at" }) firstObservedAt!: Date;
+}
+
 @Entity("prompts")
 @Index("prompt_workspace_provider_external_uq", ["workspaceId", "provider", "externalPromptId"], { unique: true })
 @Index("prompt_session_idx", ["sessionId"])
@@ -194,4 +211,4 @@ export class ToolFileAccess {
   @Column("text") attribution!: string;
 }
 
-export const entities = [Workspace, Developer, Repository, RepoSnapshot, RepoSnapshotFile, Prompt, ApiRequest, ToolEvent, ToolFileAccess];
+export const entities = [Workspace, Developer, Repository, RepoSnapshot, RepoSnapshotFile, RepoCommit, Prompt, ApiRequest, ToolEvent, ToolFileAccess];

@@ -3,6 +3,7 @@
 import Box from "@mui/material/Box";
 import { useTheme } from "@mui/material/styles";
 import { LineChart, lineClasses } from "@mui/x-charts/LineChart";
+import { ChartsReferenceLine } from "@mui/x-charts/ChartsReferenceLine";
 import type { AxisItemIdentifier, LineItemIdentifier } from "@mui/x-charts/models";
 import { ScatterChart } from "@mui/x-charts/ScatterChart";
 
@@ -25,6 +26,7 @@ export function SeriesTrend({
   series,
   label,
   timestampValueFormatter,
+  annotations = [],
   highlightedAxis,
   onHighlightedAxisChange,
   highlightedItem,
@@ -34,12 +36,19 @@ export function SeriesTrend({
   series: Array<{ id: string; label: string; data: Array<number | null> }>;
   label: string;
   timestampValueFormatter?: (timestamp: string, location: "tick" | "tooltip") => string;
+  annotations?: Array<{ timestamp: string; label?: string }>;
   highlightedAxis: AxisItemIdentifier[];
   onHighlightedAxisChange: (axis: AxisItemIdentifier[]) => void;
   highlightedItem: LineItemIdentifier | null;
   onHighlightChange: (item: LineItemIdentifier | null) => void;
 }) {
   const dates = timestamps.map((timestamp) => new Date(timestamp));
+  const domainValues = [
+    ...dates.map((date) => date.getTime()),
+    ...annotations.map((annotation) => Date.parse(annotation.timestamp)),
+  ].filter(Number.isFinite);
+  const domainMin = Math.min(...domainValues);
+  const domainMax = Math.max(...domainValues);
 
   return <Box sx={{ width: "100%", minWidth: 0 }}>
     <LineChart
@@ -49,6 +58,7 @@ export function SeriesTrend({
         id: "time",
         data: dates,
         scaleType: "time",
+        ...(domainMax > domainMin ? { min: new Date(domainMin), max: new Date(domainMax) } : {}),
         tickLabelMinGap: 36,
         valueFormatter: (value: Date, context) => timestampValueFormatter
           ? timestampValueFormatter(value.toISOString(), context.location === "tick" ? "tick" : "tooltip")
@@ -69,6 +79,16 @@ export function SeriesTrend({
       }))}
       grid={{ horizontal: true, vertical: true }}
       sx={{ [`& .${lineClasses.line}`]: { strokeWidth: 1.5 } }}
-    />
+    >
+      {annotations.map((annotation) => <ChartsReferenceLine
+        key={`${annotation.timestamp}:${annotation.label ?? ""}`}
+        x={new Date(annotation.timestamp)}
+        axisId="time"
+        label={annotation.label}
+        labelAlign="start"
+        lineStyle={{ stroke: "#777", strokeDasharray: "4 3", strokeWidth: 1 }}
+        labelStyle={{ fontSize: 10, fill: "#555" }}
+      />)}
+    </LineChart>
   </Box>;
 }

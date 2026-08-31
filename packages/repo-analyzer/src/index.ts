@@ -148,6 +148,26 @@ export async function detectRepository(
     fingerprint,
   };
 }
+
+export async function analyzeCommits(root: string, limit = 250) {
+  const output = await git(root, [
+    "log",
+    `--max-count=${limit}`,
+    "--format=%H%x1f%aI%x1f%an%x1f%ae%x1f%cI%x1f%cn%x1f%ce%x1e",
+  ]).catch(() => "");
+  return output.split("\x1e").map((record) => record.trim()).filter(Boolean).map((record) => {
+    const [sha, authoredAt, authorName, authorEmail, committedAt, committerName, committerEmail] = record.split("\x1f");
+    return {
+      sha,
+      authorName,
+      authorEmail,
+      authoredAt: new Date(authoredAt).toISOString(),
+      committerName,
+      committerEmail,
+      committedAt: new Date(committedAt).toISOString(),
+    };
+  }).filter((commit) => commit.sha && commit.committedAt);
+}
 export function normalizeRemote(remote: string) {
   if (!remote) return null;
   let s = remote.trim().replace(/^git@([^:]+):/, "ssh://git@$1/");
@@ -331,5 +351,6 @@ export async function analyzeRepository(root: string) {
       languageDistribution: langs,
     },
     files,
+    commits: await analyzeCommits(root),
   };
 }

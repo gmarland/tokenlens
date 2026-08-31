@@ -9,7 +9,9 @@ import type {
 import { SeriesTrend } from "./charts";
 import { EmptyState } from "./ui";
 import {
+  buildRepositoryCommitMarkers,
   buildRepositoryStructureTrend,
+  type RepositoryCommit,
   type RepositoryStructureSnapshot,
 } from "./repository-structure-data";
 import { useRepositoryTimeFilters } from "./repository-time-filters";
@@ -17,8 +19,10 @@ import { TimeFilterControls } from "./time-filter-controls";
 
 export function RepositoryStructureTrend({
   snapshots,
+  commits,
 }: {
   snapshots: RepositoryStructureSnapshot[];
+  commits: RepositoryCommit[];
 }) {
   const [highlightedAxis, setHighlightedAxis] = useState<AxisItemIdentifier[]>(
     [],
@@ -51,6 +55,13 @@ export function RepositoryStructureTrend({
       trend.snapshots[index],
     ]),
   );
+  const commitMarkers = buildRepositoryCommitMarkers(
+    commits,
+    trend.observations,
+    timeRange,
+    customRange,
+    latestTimestamp ?? undefined,
+  );
   const interaction = {
     highlightedAxis,
     onHighlightedAxisChange: setHighlightedAxis,
@@ -75,7 +86,8 @@ export function RepositoryStructureTrend({
       : "";
     return `${date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "medium" })}${context}`;
   };
-  const chart = (label: string, data: number[]) => (
+  const commitLabelStep = Math.max(1, Math.ceil(commitMarkers.length / 10));
+  const chart = (label: string, data: number[], showCommitLabels = false) => (
     <>
       <Typography variant="subtitle2" sx={{ mt: 2.5, mb: -1 }}>
         {label}
@@ -85,6 +97,12 @@ export function RepositoryStructureTrend({
         series={[{ id: "repository", label, data }]}
         label={label}
         timestampValueFormatter={timestampValueFormatter}
+        annotations={commitMarkers.map((commit, index) => ({
+          timestamp: commit.committedAt,
+          label: showCommitLabels && (index % commitLabelStep === 0 || index === commitMarkers.length - 1)
+            ? `${commit.sha.slice(0, 7)} · ${commit.authorName || commit.authorEmail || "Unknown author"}`
+            : undefined,
+        }))}
         {...interaction}
       />
     </>
@@ -93,6 +111,9 @@ export function RepositoryStructureTrend({
   return (
     <>
       <TimeFilterControls idPrefix="repository-structure" />
+      <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
+        Dashed markers show commit time and author. Commit messages are not collected.
+      </Typography>
       {trend.snapshots.length === 1 && (
         <Typography color="text.secondary" sx={{ mt: 1 }}>
           One snapshot is available; future snapshots will form the trend line.
@@ -101,6 +122,7 @@ export function RepositoryStructureTrend({
       {chart(
         "Source LOC",
         trend.snapshots.map((snapshot) => snapshot.totalSourceLoc),
+        true,
       )}
       {chart(
         "Source files",

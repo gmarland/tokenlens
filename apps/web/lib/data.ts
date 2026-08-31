@@ -64,19 +64,38 @@ export async function repository(id: string, model?: string, provider?: string) 
   if (!repo) return null;
 
   const snapshotParameters = new Parameters();
-  const snapshots = (await rows(`select s.id,s.captured_at,s.branch,s.head_sha,s.total_source_loc,s.source_files,
+  const snapshots = (await rows(`select s.id,s.captured_at,s.branch,s.head_sha,s.dirty,s.total_source_loc,s.source_files,
       count(distinct nullif(f.module_name,''))::int modules
     from repo_snapshots s left join repo_snapshot_files f on f.snapshot_id=s.id
     where s.repository_id=${snapshotParameters.add(id)}::uuid
-    group by s.id,s.captured_at,s.branch,s.head_sha,s.total_source_loc,s.source_files
+    group by s.id,s.captured_at,s.branch,s.head_sha,s.dirty,s.total_source_loc,s.source_files
     order by s.captured_at,s.id`, snapshotParameters)).map((snapshot) => ({
       id: snapshot.id,
       capturedAt: new Date(snapshot.captured_at).toISOString(),
       branch: snapshot.branch,
       headSha: snapshot.head_sha,
+      dirty: snapshot.dirty,
       totalSourceLoc: Number(snapshot.total_source_loc ?? 0),
       sourceFiles: Number(snapshot.source_files ?? 0),
       modules: Number(snapshot.modules ?? 0),
+    }));
+
+  const commitParameters = new Parameters();
+  const commits = (await rows(`select * from (
+      select sha,author_name,author_email,authored_at,committer_name,committer_email,committed_at,
+        observed_branch,first_observed_at
+      from repo_commits where repository_id=${commitParameters.add(id)}::uuid
+      order by committed_at desc limit 1000
+    )c order by committed_at`, commitParameters)).map((commit) => ({
+      sha: commit.sha,
+      authorName: commit.author_name,
+      authorEmail: commit.author_email,
+      authoredAt: new Date(commit.authored_at).toISOString(),
+      committerName: commit.committer_name,
+      committerEmail: commit.committer_email,
+      committedAt: new Date(commit.committed_at).toISOString(),
+      observedBranch: commit.observed_branch,
+      firstObservedAt: new Date(commit.first_observed_at).toISOString(),
     }));
 
   const promptParameters = new Parameters();
@@ -115,7 +134,7 @@ export async function repository(id: string, model?: string, provider?: string) 
   const providerParameters = new Parameters();
   const providers = await rows(`select provider,count(*)::int count from prompts where repository_id=${providerParameters.add(id)}::uuid
     group by provider order by count desc`, providerParameters);
-  return { repo, snapshots, prompts: promptRows, models, providers };
+  return { repo, snapshots, commits, prompts: promptRows, models, providers };
 }
 
 export async function repositoryPrompts(id: string, sort = "context", model?: string, provider?: string) {

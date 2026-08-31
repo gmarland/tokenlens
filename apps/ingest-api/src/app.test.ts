@@ -110,6 +110,10 @@ describe("ingestion API", () => {
       },
     });
     expect(snapshot.json()).toEqual({ id: "snapshot-1" });
+    expect(service.ingestSnapshot).toHaveBeenCalledWith(
+      "workspace-1",
+      expect.objectContaining({ commits: [] }),
+    );
 
     const otlp = await app.inject({
       method: "POST",
