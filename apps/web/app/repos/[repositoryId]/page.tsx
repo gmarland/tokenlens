@@ -62,7 +62,7 @@ export default async function Repo({ params, searchParams }: any) {
       key={`${q.provider ?? ""}:${q.model ?? ""}`}
       prompts={rs.map((x: any) => ({
         id: x.id,
-        date: new Date(x.started_at).toLocaleDateString(),
+        startedAt: new Date(x.started_at).toISOString(),
         context: Number(x.context_tokens),
         files: Number(x.files_read),
         branch: x.branch,

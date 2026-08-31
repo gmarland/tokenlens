@@ -1,6 +1,6 @@
 export type AgentBehaviourPrompt = {
   id: string;
-  date: string;
+  startedAt: string;
   context: number;
   files: number;
   branch: string | null;
@@ -17,12 +17,72 @@ export type BehaviourGroup = {
 };
 
 export type BehaviourMetric = "context" | "files";
+export type TimeAggregation = "minute" | "hour" | "day" | "week" | "month";
+export type TimeRange = "all" | "24h" | "7d" | "30d" | "90d" | "1y" | "custom";
+
+export type CustomTimeRange = {
+  start: string;
+  end: string;
+};
 
 export type BehaviourTrendSeries = {
   id: string;
   label: string;
   data: Array<number | null>;
 };
+
+export type BehaviourTrend = {
+  timestamps: string[];
+  series: BehaviourTrendSeries[];
+};
+
+export const timeAggregationOptions: Array<{ value: TimeAggregation; label: string }> = [
+  { value: "minute", label: "Minutes" },
+  { value: "hour", label: "Hours" },
+  { value: "day", label: "Days" },
+  { value: "week", label: "Weeks" },
+  { value: "month", label: "Months" },
+];
+
+export const timeRangeOptions: Array<{ value: TimeRange; label: string }> = [
+  { value: "all", label: "All time" },
+  { value: "24h", label: "Last 24 hours" },
+  { value: "7d", label: "Last 7 days" },
+  { value: "30d", label: "Last 30 days" },
+  { value: "90d", label: "Last 90 days" },
+  { value: "1y", label: "Last year" },
+  { value: "custom", label: "Custom range…" },
+];
+
+const timeRangeMilliseconds: Record<Exclude<TimeRange, "all" | "custom">, number> = {
+  "24h": 24 * 60 * 60 * 1_000,
+  "7d": 7 * 24 * 60 * 60 * 1_000,
+  "30d": 30 * 24 * 60 * 60 * 1_000,
+  "90d": 90 * 24 * 60 * 60 * 1_000,
+  "1y": 365 * 24 * 60 * 60 * 1_000,
+};
+
+export function filterBehaviourPromptsByRange(
+  prompts: AgentBehaviourPrompt[],
+  range: TimeRange,
+  customRange: CustomTimeRange | null = null,
+) {
+  if (range === "all" || !prompts.length) return prompts;
+
+  if (range === "custom") {
+    if (!customRange) return prompts;
+    const start = Date.parse(`${customRange.start}T00:00:00.000Z`);
+    const end = Date.parse(`${customRange.end}T23:59:59.999Z`);
+    return prompts.filter((prompt) => {
+      const timestamp = Date.parse(prompt.startedAt);
+      return timestamp >= start && timestamp <= end;
+    });
+  }
+
+  const latestTimestamp = Math.max(...prompts.map((prompt) => Date.parse(prompt.startedAt)));
+  const cutoff = latestTimestamp - timeRangeMilliseconds[range];
+  return prompts.filter((prompt) => Date.parse(prompt.startedAt) >= cutoff);
+}
 
 export function agentBehaviourUserLabel(prompt: AgentBehaviourPrompt) {
   if (prompt.developerLabel) return prompt.developerLabel;
@@ -52,17 +112,58 @@ export function groupBehaviourPrompts(
     b.prompts.length - a.prompts.length || a.label.localeCompare(b.label));
 }
 
-export function buildBehaviourTrendSeries(
+export function behaviourBucketStart(startedAt: string, aggregation: TimeAggregation) {
+  const date = new Date(startedAt);
+
+  if (aggregation === "minute") date.setUTCSeconds(0, 0);
+  else if (aggregation === "hour") date.setUTCMinutes(0, 0, 0);
+  else if (aggregation === "day") date.setUTCHours(0, 0, 0, 0);
+  else if (aggregation === "week") {
+    date.setUTCHours(0, 0, 0, 0);
+    date.setUTCDate(date.getUTCDate() - ((date.getUTCDay() + 6) % 7));
+  } else {
+    date.setUTCDate(1);
+    date.setUTCHours(0, 0, 0, 0);
+  }
+
+  return date.toISOString();
+}
+
+function median(values: number[]) {
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+}
+
+export function buildAggregatedBehaviourTrend(
   prompts: AgentBehaviourPrompt[],
   groups: BehaviourGroup[],
   metric: BehaviourMetric,
-): BehaviourTrendSeries[] {
-  return groups.map((group) => {
+  aggregation: TimeAggregation,
+): BehaviourTrend {
+  const timestamps = [...new Set(prompts.map((prompt) =>
+    behaviourBucketStart(prompt.startedAt, aggregation)))].sort();
+  const series = groups.map((group) => {
     const groupPromptIds = new Set(group.prompts.map((prompt) => prompt.id));
+    const valuesByTimestamp = new Map<string, number[]>();
+
+    for (const prompt of prompts) {
+      if (!groupPromptIds.has(prompt.id)) continue;
+      const timestamp = behaviourBucketStart(prompt.startedAt, aggregation);
+      const values = valuesByTimestamp.get(timestamp);
+      if (values) values.push(prompt[metric]);
+      else valuesByTimestamp.set(timestamp, [prompt[metric]]);
+    }
+
     return {
       id: group.key,
       label: group.label,
-      data: prompts.map((prompt) => groupPromptIds.has(prompt.id) ? prompt[metric] : null),
+      data: timestamps.map((timestamp) => {
+        const values = valuesByTimestamp.get(timestamp);
+        return values ? median(values) : null;
+      }),
     };
   });
+
+  return { timestamps, series };
 }

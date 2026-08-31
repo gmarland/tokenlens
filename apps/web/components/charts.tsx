@@ -2,7 +2,8 @@
 
 import Box from "@mui/material/Box";
 import { useTheme } from "@mui/material/styles";
-import { LineChart } from "@mui/x-charts/LineChart";
+import { LineChart, lineClasses } from "@mui/x-charts/LineChart";
+import type { AxisItemIdentifier, LineItemIdentifier } from "@mui/x-charts/models";
 import { ScatterChart } from "@mui/x-charts/ScatterChart";
 
 export function ScatterPlot({ data, x, y }: { data: any[]; x: string; y: string }) {
@@ -19,53 +20,51 @@ export function ScatterPlot({ data, x, y }: { data: any[]; x: string; y: string 
   </Box>;
 }
 
-export function Trend({
-  data,
-  keys,
-  labels = {},
-}: {
-  data: any[];
-  keys: string[];
-  labels?: Record<string, string>;
-}) {
-  const theme = useTheme();
-  return <Box sx={{ width: "100%", minWidth: 0 }}>
-    <LineChart
-      height={260}
-      dataset={data}
-      xAxis={[{ dataKey: "date", scaleType: "point" }]}
-      series={keys.map((key, index) => ({
-        dataKey: key,
-        label: labels[key] ?? key,
-        color: index ? theme.palette.primary.main : theme.palette.info.main,
-        showMark: false,
-      }))}
-      grid={{ horizontal: true, vertical: true }}
-    />
-  </Box>;
-}
-
 export function SeriesTrend({
-  dates,
+  timestamps,
   series,
   label,
+  highlightedAxis,
+  onHighlightedAxisChange,
+  highlightedItem,
+  onHighlightChange,
 }: {
-  dates: string[];
+  timestamps: string[];
   series: Array<{ id: string; label: string; data: Array<number | null> }>;
   label: string;
+  highlightedAxis: AxisItemIdentifier[];
+  onHighlightedAxisChange: (axis: AxisItemIdentifier[]) => void;
+  highlightedItem: LineItemIdentifier | null;
+  onHighlightChange: (item: LineItemIdentifier | null) => void;
 }) {
+  const dates = timestamps.map((timestamp) => new Date(timestamp));
+
   return <Box sx={{ width: "100%", minWidth: 0 }}>
     <LineChart
       height={280}
       hideLegend
-      xAxis={[{ data: dates, scaleType: "point" }]}
+      xAxis={[{
+        id: "time",
+        data: dates,
+        scaleType: "time",
+        tickLabelMinGap: 36,
+        valueFormatter: (value: Date, context) => context.location === "tick"
+          ? value.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
+          : value.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "medium" }),
+      }]}
       yAxis={[{ label }]}
+      axisHighlight={{ x: "line" }}
+      highlightedAxis={highlightedAxis}
+      onHighlightedAxisChange={onHighlightedAxisChange}
+      highlightedItem={highlightedItem}
+      onHighlightChange={onHighlightChange}
       series={series.map((item) => ({
         ...item,
         connectNulls: true,
-        showMark: item.data.filter((value) => value != null).length === 1,
+        showMark: true,
       }))}
       grid={{ horizontal: true, vertical: true }}
+      sx={{ [`& .${lineClasses.line}`]: { strokeWidth: 1.5 } }}
     />
   </Box>;
 }
