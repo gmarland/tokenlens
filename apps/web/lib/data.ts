@@ -68,13 +68,13 @@ export async function repository(id: string, model?: string, provider?: string) 
   const apiModelWhere = model ? `and model=${promptParameters.add(model)}` : "";
   const promptProviderWhere = providerWhere(provider, promptParameters);
   const selectedModel = promptParameters.add(model ?? null);
-  const promptRows = await rows(`select p.id,p.provider,p.started_at,
+  const promptRows = await rows(`select p.id,p.provider,p.started_at,p.branch,p.developer_id,d.email,
     coalesce(u.context_tokens,0)::bigint context_tokens,coalesce(t.files_read,0)::int files_read,
     coalesce(t.repeated_reads,0)::int repeated_reads,coalesce(t.tool_bytes,0)::bigint tool_bytes,
     coalesce(t.modules,0)::int modules,coalesce(t.working_loc,0)::bigint working_loc,
     coalesce(t.max_file_loc,0)::int max_file_loc,coalesce(t.mean_fan_out,0)::real mean_fan_out,t.first_edit,
     coalesce(u.model,p.model) model
-    from prompts p
+    from prompts p left join developers d on d.id=p.developer_id
     left join lateral(select sum(input_tokens+cache_read_tokens+cache_creation_tokens) context_tokens,
       case when count(distinct model)>1 then 'Multiple models' else max(model) end model
       from api_requests where prompt_id=p.id ${apiModelWhere})u on true

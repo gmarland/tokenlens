@@ -19,14 +19,51 @@ export function ScatterPlot({ data, x, y }: { data: any[]; x: string; y: string 
   </Box>;
 }
 
-export function Trend({ data, keys }: { data: any[]; keys: string[] }) {
+export function Trend({
+  data,
+  keys,
+  labels = {},
+}: {
+  data: any[];
+  keys: string[];
+  labels?: Record<string, string>;
+}) {
   const theme = useTheme();
   return <Box sx={{ width: "100%", minWidth: 0 }}>
     <LineChart
       height={260}
       dataset={data}
       xAxis={[{ dataKey: "date", scaleType: "point" }]}
-      series={keys.map((key, index) => ({ dataKey: key, label: key, color: index ? theme.palette.primary.main : theme.palette.info.main, showMark: false }))}
+      series={keys.map((key, index) => ({
+        dataKey: key,
+        label: labels[key] ?? key,
+        color: index ? theme.palette.primary.main : theme.palette.info.main,
+        showMark: false,
+      }))}
+      grid={{ horizontal: true, vertical: true }}
+    />
+  </Box>;
+}
+
+export function SeriesTrend({
+  dates,
+  series,
+  label,
+}: {
+  dates: string[];
+  series: Array<{ id: string; label: string; data: Array<number | null> }>;
+  label: string;
+}) {
+  return <Box sx={{ width: "100%", minWidth: 0 }}>
+    <LineChart
+      height={280}
+      xAxis={[{ data: dates, scaleType: "point" }]}
+      yAxis={[{ label }]}
+      series={series.map((item) => ({
+        ...item,
+        connectNulls: true,
+        showMark: item.data.filter((value) => value != null).length === 1,
+      }))}
       grid={{ horizontal: true, vertical: true }}
     />
   </Box>;

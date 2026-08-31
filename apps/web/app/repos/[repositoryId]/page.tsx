@@ -4,7 +4,7 @@ import CardContent from "@mui/material/CardContent";
 import Typography from "@mui/material/Typography";
 import { correlations, median, relationship } from "@tokenlens/analytics";
 import { notFound } from "next/navigation";
-import { Trend } from "../../../components/charts";
+import { AgentBehaviour } from "../../../components/agent-behaviour";
 import { AnalysisFilters } from "../../../components/filters";
 import { BackLink, Cards, EmptyState, Eyebrow, Intro, Label, MetricCard, Page, Panel, SectionTitle, StatCard, Toolbar } from "../../../components/ui";
 import { repository } from "../../../lib/data";
@@ -58,7 +58,18 @@ export default async function Repo({ params, searchParams }: any) {
       <MetricCard label="Median time to first edit" value={duration(median(rs.filter((x: any) => x.first_edit).map((x: any) => +new Date(x.first_edit) - +new Date(x.started_at))))} />
     </Cards>
     <Toolbar><SectionTitle>Agent behaviour</SectionTitle><BackLink href={`/repos/${id}/prompts${promptQuery.size ? `?${promptQuery}` : ""}`}>Explore prompts →</BackLink></Toolbar>
-    <Panel><Trend data={rs.map((x: any) => ({ date: new Date(x.started_at).toLocaleDateString(), context: Number(x.context_tokens), files: Number(x.files_read) }))} keys={["context", "files"]} /></Panel>
+    <Panel><AgentBehaviour
+      key={`${q.provider ?? ""}:${q.model ?? ""}`}
+      prompts={rs.map((x: any) => ({
+        id: x.id,
+        date: new Date(x.started_at).toLocaleDateString(),
+        context: Number(x.context_tokens),
+        files: Number(x.files_read),
+        branch: x.branch,
+        developerId: x.developer_id,
+        developerLabel: x.email,
+      }))}
+    /></Panel>
     <SectionTitle>Repository structure</SectionTitle>
     <Cards compact>
       <StatCard label="File LOC median / p95 / max" value={`${compact(s.median_file_loc)} / ${compact(s.p95_file_loc)} / ${compact(s.max_file_loc)}`} />
