@@ -1,19 +1,13 @@
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
-import MuiLink from "@mui/material/Link";
-import Table from "@mui/material/Table";
-import TableBody from "@mui/material/TableBody";
-import TableCell from "@mui/material/TableCell";
-import TableHead from "@mui/material/TableHead";
-import TableRow from "@mui/material/TableRow";
 import Typography from "@mui/material/Typography";
 import { spearman, relationship } from "@tokenlens/analytics";
 import { ScatterPlot } from "../components/charts";
+import { RepositoriesDataTable } from "../components/data-tables";
 import { AnalysisFilters } from "../components/filters";
-import Link from "../components/link";
 import {
   Cards, EmptyState, Eyebrow, Intro, Label, MetricCard, Page, Panel,
-  ResponsiveTable, SectionTitle, Toolbar, numericCellSx,
+  SectionTitle, Toolbar,
 } from "../components/ui";
 import { overview } from "../lib/data";
 import { compact } from "../lib/format";
@@ -74,36 +68,22 @@ export default async function Home({ searchParams }: {
         />
       </Toolbar>
 
-      <ResponsiveTable>
-        {repositories.length ? (
-          <Table>
-            <TableHead><TableRow>
-              <TableCell>Repository</TableCell>
-              <TableCell sx={numericCellSx}>Source files</TableCell>
-              <TableCell sx={numericCellSx}>LOC</TableCell>
-              <TableCell sx={numericCellSx}>Prompts</TableCell>
-              <TableCell sx={numericCellSx}>Median context</TableCell>
-              <TableCell sx={numericCellSx}>Files read</TableCell>
-            </TableRow></TableHead>
-            <TableBody>
-              {repositories.map((r: any) => (
-                <TableRow key={r.id} hover>
-                  <TableCell>
-                    <MuiLink component={Link} href={`/repos/${r.id}${query.size ? `?${query}` : ""}`} color="inherit" underline="hover" sx={{ fontWeight: 650 }}>{r.name}</MuiLink>
-                  </TableCell>
-                  <TableCell sx={numericCellSx}>{compact(r.source_files)}</TableCell>
-                  <TableCell sx={numericCellSx}>{compact(r.loc)}</TableCell>
-                  <TableCell sx={numericCellSx}>{r.prompts}</TableCell>
-                  <TableCell sx={numericCellSx}>{compact(r.median_context)}</TableCell>
-                  <TableCell sx={numericCellSx}>{Number(r.median_files).toFixed(1)}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        ) : (
-          <EmptyState>No telemetry yet. Install the profiler to begin collecting repository data.</EmptyState>
-        )}
-      </ResponsiveTable>
+      {repositories.length ? (
+        <RepositoriesDataTable
+          queryString={query.size ? `?${query}` : ""}
+          rows={repositories.map((r: any) => ({
+            id: String(r.id),
+            name: String(r.name),
+            sourceFiles: Number(r.source_files ?? 0),
+            loc: Number(r.loc ?? 0),
+            prompts: Number(r.prompts ?? 0),
+            medianContext: Number(r.median_context ?? 0),
+            medianFiles: Number(r.median_files ?? 0),
+          }))}
+        />
+      ) : (
+        <Panel sx={{ p: 0 }}><EmptyState>No telemetry yet. Install the profiler to begin collecting repository data.</EmptyState></Panel>
+      )}
 
       <SectionTitle>Repository LOC vs median context</SectionTitle>
       <Panel>

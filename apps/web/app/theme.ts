@@ -133,27 +133,6 @@ const theme = createTheme({
     MuiInputLabel: {
       styleOverrides: { root: { fontWeight: 700 } },
     },
-    MuiTableCell: {
-      styleOverrides: {
-        root: { borderBottomColor: line, paddingBlock: 15 },
-        head: {
-          borderBottomColor: black,
-          backgroundColor: black,
-          color: "#ffffff",
-          fontSize: 10,
-          fontWeight: 800,
-          letterSpacing: ".09em",
-          textTransform: "uppercase",
-        },
-      },
-    },
-    MuiTableRow: {
-      styleOverrides: {
-        root: {
-          "&.MuiTableRow-hover:hover": { backgroundColor: "rgba(255,255,0,.22)" },
-        },
-      },
-    },
     MuiAlert: {
       styleOverrides: {
         root: { borderColor: black },

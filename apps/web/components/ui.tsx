@@ -6,7 +6,6 @@ import Container from "@mui/material/Container";
 import MuiLink from "@mui/material/Link";
 import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
-import TableContainer from "@mui/material/TableContainer";
 import Typography from "@mui/material/Typography";
 import Link from "./link";
 
@@ -82,14 +81,6 @@ export function Panel({ children, sx = {} }: { children: ReactNode; sx?: object 
   );
 }
 
-export function ResponsiveTable({ children }: { children: ReactNode }) {
-  return (
-    <TableContainer component={Paper} variant="outlined" sx={{ mt: 2, boxShadow: "8px 8px 0 #d5d5cb" }}>
-      {children}
-    </TableContainer>
-  );
-}
-
 export function Eyebrow({ children, sx = {} }: { children: ReactNode; sx?: object }) {
   return (
     <Typography
@@ -126,5 +117,3 @@ export function BackLink({ href, children }: { href: string; children: ReactNode
 export function EmptyState({ children }: { children: ReactNode }) {
   return <Typography color="text.secondary" sx={{ textAlign: "center", px: 2, py: 7.5 }}>{children}</Typography>;
 }
-
-export const numericCellSx = { textAlign: "right", fontVariantNumeric: "tabular-nums" } as const;

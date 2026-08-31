@@ -2,15 +2,11 @@ import Box from "@mui/material/Box";
 import List from "@mui/material/List";
 import ListItem from "@mui/material/ListItem";
 import ListItemText from "@mui/material/ListItemText";
-import Table from "@mui/material/Table";
-import TableBody from "@mui/material/TableBody";
-import TableCell from "@mui/material/TableCell";
-import TableHead from "@mui/material/TableHead";
-import TableRow from "@mui/material/TableRow";
 import Typography from "@mui/material/Typography";
 import { median } from "@tokenlens/analytics";
 import { notFound } from "next/navigation";
-import { BackLink, Cards, EmptyState, Eyebrow, Intro, MetricCard, Page, Panel, ResponsiveTable, SectionTitle, numericCellSx } from "../../../components/ui";
+import { FileReadsDataTable } from "../../../components/data-tables";
+import { BackLink, Cards, EmptyState, Eyebrow, Intro, MetricCard, Page, Panel, SectionTitle } from "../../../components/ui";
 import { promptDetail } from "../../../lib/data";
 import { compact, money, duration, date } from "../../../lib/format";
 import { canonicalToolActions } from "../../../lib/tool-events";
@@ -82,12 +78,14 @@ export default async function Prompt({ params }: any) {
       ["Mean fan-out", (files.length ? files.reduce((n, x) => n + Number(x.dependency_fan_out ?? 0), 0) / files.length : 0).toFixed(1)],
       ["Files in cycles", String(files.filter((x) => x.in_dependency_cycle).length)],
     ]) : <Panel><EmptyState>No attributable file reads were observed. Shell reads are included only when a concrete repository file can be identified locally.</EmptyState></Panel>}
-    <ResponsiveTable>{files.length ? <Table><TableHead><TableRow>
-      <TableCell>File</TableCell>{["LOC", "Reads", "Fan-out"].map((x) => <TableCell key={x} sx={numericCellSx}>{x}</TableCell>)}<TableCell>Module</TableCell>
-    </TableRow></TableHead><TableBody>{files.sort((a, b) => b.reads - a.reads).map((f: any) => <TableRow key={f.relative_file_path} hover>
-      <TableCell sx={{ fontWeight: 650 }}>{f.relative_file_path}</TableCell><TableCell sx={numericCellSx}>{compact(f.loc)}</TableCell>
-      <TableCell sx={numericCellSx}>{f.reads}</TableCell><TableCell sx={numericCellSx}>{f.dependency_fan_out ?? "—"}</TableCell><TableCell>{f.module_name ?? "Unmatched snapshot"}</TableCell>
-    </TableRow>)}</TableBody></Table> : <EmptyState>No file reads were attributed to this prompt.</EmptyState>}</ResponsiveTable>
+    {files.length ? <FileReadsDataTable rows={files.map((f: any) => ({
+      id: String(f.relative_file_path),
+      file: String(f.relative_file_path),
+      loc: Number(f.loc ?? 0),
+      reads: Number(f.reads ?? 0),
+      fanOut: f.dependency_fan_out == null ? null : Number(f.dependency_fan_out),
+      module: String(f.module_name ?? "Unmatched snapshot"),
+    }))} /> : <Panel sx={{ p: 0 }}><EmptyState>No file reads were attributed to this prompt.</EmptyState></Panel>}
     <SectionTitle>Timeline</SectionTitle><Panel sx={{ p: 0 }}><List disablePadding>{timeline.map((e, i) => <ListItem key={i} sx={{ alignItems: "flex-start", borderLeft: 2, borderColor: "divider", ml: 2, pl: 3, py: 1.5 }}>
       <Box sx={{ position: "absolute", width: 10, height: 10, bgcolor: "primary.main", borderRadius: "50%", left: -6, top: 20 }} />
       <ListItemText primary={e.kind} secondary={date(e.timestamp)} slotProps={{ primary: { sx: { fontWeight: 700 } }, secondary: { sx: { fontSize: 12 } } }} />
