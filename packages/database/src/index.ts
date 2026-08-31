@@ -14,6 +14,10 @@ import { RepoCommits2026083100030 } from "./migrations/2026083100030-RepoCommits
 export const dataSource = new DataSource({
   type: "postgres",
   url: process.env.DATABASE_URL ?? "postgres://tokenlens:tokenlens@localhost:5432/tokenlens",
+  // PostgreSQL stores timestamptz values as UTC instants, while the session
+  // timezone controls their input interpretation and output representation.
+  // Pin every application and migration connection so both are consistently UTC.
+  extra: { options: "-c timezone=UTC" },
   entities,
   migrations: [
     InitialSchema2026082900000,

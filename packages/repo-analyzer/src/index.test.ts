@@ -53,10 +53,10 @@ describe("commit analysis", () => {
         ...process.env,
         GIT_AUTHOR_NAME: "Ada Author",
         GIT_AUTHOR_EMAIL: "ada@example.com",
-        GIT_AUTHOR_DATE: "2026-08-30T10:00:00Z",
+        GIT_AUTHOR_DATE: "2026-08-30T12:00:00+02:00",
         GIT_COMMITTER_NAME: "Chris Committer",
         GIT_COMMITTER_EMAIL: "chris@example.com",
-        GIT_COMMITTER_DATE: "2026-08-30T11:00:00Z",
+        GIT_COMMITTER_DATE: "2026-08-30T13:00:00+02:00",
       },
     });
 

@@ -16,6 +16,7 @@ import {
 } from "./repository-structure-data";
 import { useRepositoryTimeFilters } from "./repository-time-filters";
 import { TimeFilterControls } from "./time-filter-controls";
+import { formatLocalTimestamp } from "../lib/date-time";
 
 export function RepositoryStructureTrend({
   snapshots,
@@ -72,19 +73,14 @@ export function RepositoryStructureTrend({
     timestamp: string,
     location: "tick" | "tooltip",
   ) => {
-    const date = new Date(timestamp);
     if (location === "tick") {
-      return date.toLocaleString(undefined, {
-        month: "short",
-        day: "numeric",
-        year: "2-digit",
-      });
+      return formatLocalTimestamp(timestamp, "date");
     }
     const snapshot = snapshotByTimestamp.get(timestamp);
     const context = snapshot
       ? ` · ${snapshot.branch} · ${snapshot.headSha.slice(0, 7)}`
       : "";
-    return `${date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "medium" })}${context}`;
+    return `${formatLocalTimestamp(timestamp, "detail")}${context}`;
   };
   const commitLabelStep = Math.max(1, Math.ceil(commitMarkers.length / 10));
   const chart = (label: string, data: number[], showCommitLabels = false) => (
@@ -112,7 +108,8 @@ export function RepositoryStructureTrend({
     <>
       <TimeFilterControls idPrefix="repository-structure" />
       <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
-        Dashed markers show commit time and author. Commit messages are not collected.
+        Dashed markers show commit time and author. Times are shown in your local time zone.
+        Commit messages are not collected.
       </Typography>
       {trend.snapshots.length === 1 && (
         <Typography color="text.secondary" sx={{ mt: 1 }}>

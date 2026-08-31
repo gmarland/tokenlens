@@ -6,6 +6,7 @@ import { LineChart, lineClasses } from "@mui/x-charts/LineChart";
 import { ChartsReferenceLine } from "@mui/x-charts/ChartsReferenceLine";
 import type { AxisItemIdentifier, LineItemIdentifier } from "@mui/x-charts/models";
 import { ScatterChart } from "@mui/x-charts/ScatterChart";
+import { formatLocalTimestamp } from "../lib/date-time";
 
 export function ScatterPlot({ data, x, y }: { data: any[]; x: string; y: string }) {
   const theme = useTheme();
@@ -43,10 +44,8 @@ export function SeriesTrend({
   onHighlightChange: (item: LineItemIdentifier | null) => void;
 }) {
   const dates = timestamps.map((timestamp) => new Date(timestamp));
-  const domainValues = [
-    ...dates.map((date) => date.getTime()),
-    ...annotations.map((annotation) => Date.parse(annotation.timestamp)),
-  ].filter(Number.isFinite);
+  // Annotations describe the series; they must not extend its observed range.
+  const domainValues = dates.map((date) => date.getTime()).filter(Number.isFinite);
   const domainMin = Math.min(...domainValues);
   const domainMax = Math.max(...domainValues);
 
@@ -63,8 +62,8 @@ export function SeriesTrend({
         valueFormatter: (value: Date, context) => timestampValueFormatter
           ? timestampValueFormatter(value.toISOString(), context.location === "tick" ? "tick" : "tooltip")
           : context.location === "tick"
-            ? value.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
-            : value.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "medium" }),
+            ? formatLocalTimestamp(value, "compact")
+            : formatLocalTimestamp(value, "detail"),
       }]}
       yAxis={[{ label }]}
       axisHighlight={{ x: "line" }}
