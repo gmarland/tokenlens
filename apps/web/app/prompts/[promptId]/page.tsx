@@ -24,6 +24,7 @@ export default async function Prompt({ params }: any) {
   const sum = (k: string) => api.reduce((n: number, x: any) => n + Number(x[k] ?? 0), 0);
   const fresh = sum("input_tokens"), cacheRead = sum("cache_read_tokens"), cacheCreate = sum("cache_creation_tokens"), output = sum("output_tokens");
   const context = fresh + cacheRead + cacheCreate;
+  const cacheMetricsAvailable = api.length > 0 && api.every((x: any) => x.cache_metrics_available);
   const actions = canonicalToolActions(tools);
   const reads = actions.filter((action) => action.category === "read").flatMap((action) => action.rows)
     .filter((x): x is typeof x & { relative_file_path: string } => Boolean(x.relative_file_path));
@@ -59,7 +60,7 @@ export default async function Prompt({ params }: any) {
     <Typography variant="h1">{p.prompt_text ? p.prompt_text.slice(0, 100) : `Prompt #${p.external_prompt_id.slice(0, 10)}`}</Typography>
     <Intro>{p.email ?? "Identity pending"} · Prompt length {compact(p.prompt_length)} characters · No tool contents are stored.</Intro>
     <SectionTitle>Usage</SectionTitle>{cards([
-      ["Fresh input", compact(fresh)], ["Cache read", compact(cacheRead)], ["Cache creation", compact(cacheCreate)], ["Output", compact(output)],
+      ["Fresh input", cacheMetricsAvailable ? compact(fresh) : "—"], ["Cache read", cacheMetricsAvailable ? compact(cacheRead) : "—"], ["Cache creation", cacheMetricsAvailable ? compact(cacheCreate) : "—"], ["Output", compact(output)],
       ["Context processed", compact(context)], ["Cost", money(costs.length ? costs.reduce((n: number, x: any) => n + Number(x), 0) : null)], ["Model responses", String(api.length)],
     ])}
     <SectionTitle>Agent behaviour</SectionTitle>{cards([

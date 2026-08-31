@@ -46,7 +46,7 @@ describe("OTLP parser", () => {
     });
   });
 
-  it("normalizes Codex response tokens without double-counting cache", () => {
+  it("normalizes current Codex cache fields without double-counting input", () => {
     const got = parseOtlp({
       resourceLogs: [
         {
@@ -66,7 +66,8 @@ describe("OTLP parser", () => {
                     av("event.kind", "response.completed"),
                     av("turn.id", "turn-1"),
                     av("input_token_count", 100),
-                    av("cached_input_token_count", 60),
+                    av("cached_token_count", 60),
+                    av("cache_write_token_count", 10),
                     av("output_token_count", 20),
                   ],
                 },
@@ -83,12 +84,44 @@ describe("OTLP parser", () => {
       promptId: "turn-1",
       sessionId: "thread-1",
       model: "gpt-5.6-sol",
+      inputTokens: 30,
+      cacheReadTokens: 60,
+      cacheCreationTokens: 10,
+      outputTokens: 20,
+    });
+    if (got[0].kind !== "api_request") throw new Error("expected API request");
+    expect(
+      got[0].inputTokens +
+      got[0].cacheReadTokens +
+      got[0].cacheCreationTokens,
+    ).toBe(100);
+    expect(got[0]).not.toHaveProperty("costUsd");
+  });
+
+  it("continues to accept legacy Codex cache field aliases", () => {
+    const [got] = parseOtlp({
+      resourceLogs: [{
+        scopeLogs: [{
+          logRecords: [{
+            timeUnixNano: "1700000000000000000",
+            attributes: [
+              av("event.name", "codex.sse_event"),
+              av("event.kind", "response.completed"),
+              av("turn.id", "turn-legacy"),
+              av("input_token_count", 100),
+              av("cached_input_token_count", 60),
+              av("output_token_count", 20),
+            ],
+          }],
+        }],
+      }],
+    });
+
+    expect(got).toMatchObject({
       inputTokens: 40,
       cacheReadTokens: 60,
       cacheCreationTokens: 0,
-      outputTokens: 20,
     });
-    expect(got[0]).not.toHaveProperty("costUsd");
   });
 
   it("uses the observed timestamp when Codex emits a zero event timestamp", () => {

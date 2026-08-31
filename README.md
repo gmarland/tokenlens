@@ -93,8 +93,8 @@ routes require a bearer secret; only its SHA-256 digest is stored in PostgreSQL.
 Payloads are size-limited and relative paths reject traversal.
 
 Codex plan usage does not expose a comparable per-turn dollar cost, so TokenLens
-records Codex cost as unavailable. OpenAI cached input is normalized as a subset
-of input tokens before storage to prevent double-counting.
+records Codex cost as unavailable. OpenAI cache reads and writes are normalized
+as subsets of input tokens before storage to prevent double-counting.
 
 ## Analytics
 

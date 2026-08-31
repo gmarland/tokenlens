@@ -159,6 +159,7 @@ export class ApiRequest {
   @Column("integer", { name: "output_tokens", default: 0 }) outputTokens!: number;
   @Column("integer", { name: "cache_read_tokens", default: 0 }) cacheReadTokens!: number;
   @Column("integer", { name: "cache_creation_tokens", default: 0 }) cacheCreationTokens!: number;
+  @Column("boolean", { name: "cache_metrics_available", default: false }) cacheMetricsAvailable!: boolean;
   @Column("numeric", { name: "cost_usd", precision: 14, scale: 6, nullable: true }) costUsd!: string | null;
   @Column("integer", { name: "duration_ms", default: 0 }) durationMs!: number;
   @Column("timestamptz") timestamp!: Date;

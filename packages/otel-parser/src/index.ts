@@ -66,6 +66,7 @@ export type NormalizedAgentEvent =
       outputTokens: number;
       cacheReadTokens: number;
       cacheCreationTokens: number;
+      cacheMetricsAvailable: boolean;
       costUsd?: number;
       durationMs: number;
     })
@@ -155,6 +156,7 @@ function parseClaude(
       outputTokens: num(a.output_tokens),
       cacheReadTokens: num(a.cache_read_tokens),
       cacheCreationTokens: num(a.cache_creation_tokens),
+      cacheMetricsAvailable: true,
       costUsd: num(a.cost_usd),
       durationMs: num(a.duration_ms),
     };
@@ -194,10 +196,21 @@ function parseCodex(
     const cached = num(
       pick(
         a,
+        "cached_token_count",
         "cached_input_token_count",
         "cached_input_tokens",
         "cached_tokens",
         "gen_ai.usage.cached_input_tokens",
+      ),
+    );
+    const cacheWrite = num(
+      pick(
+        a,
+        "cache_write_token_count",
+        "cache_write_input_token_count",
+        "cache_write_input_tokens",
+        "cache_write_tokens",
+        "gen_ai.usage.cache_write_input_tokens",
       ),
     );
     return {
@@ -205,9 +218,9 @@ function parseCodex(
       kind: "api_request",
       requestId: str(pick(a, "request_id", "response.id", "response_id")),
       querySource: "codex",
-      // OpenAI cached input is a subset of input. Store only fresh input in the
-      // additive TokenLens columns so context totals do not double-count it.
-      inputTokens: Math.max(0, totalInput - cached),
+      // OpenAI cache reads and writes are subsets of input. Store only fresh
+      // input in the additive TokenLens columns so their sum remains total input.
+      inputTokens: Math.max(0, totalInput - cached - cacheWrite),
       outputTokens: num(
         pick(
           a,
@@ -217,7 +230,8 @@ function parseCodex(
         ),
       ),
       cacheReadTokens: cached,
-      cacheCreationTokens: 0,
+      cacheCreationTokens: cacheWrite,
+      cacheMetricsAvailable: true,
       durationMs: num(pick(a, "duration_ms", "duration.ms")),
     };
   }

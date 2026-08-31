@@ -242,7 +242,7 @@ export async function ingestOtel(workspaceId: string, events: NormalizedAgentEve
     }
 
     if (event.kind === "api_request") {
-      await apiRequests.createQueryBuilder().insert().values({
+      await apiRequests.upsert({
         workspaceId,
         promptId: prompt.id,
         eventSequence: event.sequence,
@@ -253,10 +253,14 @@ export async function ingestOtel(workspaceId: string, events: NormalizedAgentEve
         outputTokens: event.outputTokens,
         cacheReadTokens: event.cacheReadTokens,
         cacheCreationTokens: event.cacheCreationTokens,
+        cacheMetricsAvailable: event.cacheMetricsAvailable,
         costUsd: event.costUsd === undefined ? null : String(event.costUsd),
         durationMs: event.durationMs,
         timestamp: event.timestamp,
-      }).orIgnore().execute();
+      }, {
+        conflictPaths: ["workspaceId", "promptId", "eventSequence"],
+        skipUpdateIfNoValuesChanged: true,
+      });
     }
     if (event.kind === "tool_result") {
       await upsertAndFind(toolEvents, {
