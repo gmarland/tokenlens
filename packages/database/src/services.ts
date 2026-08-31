@@ -7,6 +7,7 @@ import {
   RepoSnapshotFile,
   Repository,
   ToolEvent,
+  ToolFileAccess,
   db,
 } from "./index";
 import type { PromptHook, ToolHook, SnapshotUpload, Provider } from "@tokenlens/shared";
@@ -59,7 +60,7 @@ export async function promptForEvent(workspaceId: string, event: NormalizedAgent
   return stub(workspaceId, event.provider, event.promptId, event.sessionId);
 }
 
-async function reconcileCodexSessionPrompt(prompt: Prompt) {
+export async function reconcileCodexSessionPrompt(prompt: Prompt) {
   if (prompt.provider !== "codex" || !prompt.sessionId || !prompt.startedAt) return;
   const source = await db();
   await source.transaction(async (manager) => {
@@ -88,7 +89,8 @@ async function reconcileCodexSessionPrompt(prompt: Prompt) {
         AND (bounds.next_started_at IS NULL OR event.${timestamp} < bounds.next_started_at)
     `;
 
-    await manager.query(`
+    const statements = [
+      `
       WITH candidates AS (${candidates("api_requests", "timestamp")})
       DELETE FROM api_requests duplicate
       USING candidates
@@ -99,14 +101,14 @@ async function reconcileCodexSessionPrompt(prompt: Prompt) {
             AND existing.prompt_id = candidates.target_prompt_id
             AND existing.event_sequence = duplicate.event_sequence
             AND existing.id <> duplicate.id
-        );
-
+        )`,
+      `
       WITH candidates AS (${candidates("api_requests", "timestamp")})
       UPDATE api_requests event
       SET prompt_id = candidates.target_prompt_id
       FROM candidates
-      WHERE event.id = candidates.event_id;
-
+      WHERE event.id = candidates.event_id`,
+      `
       WITH candidates AS (${candidates("tool_events", "timestamp")})
       DELETE FROM tool_events duplicate
       USING candidates
@@ -117,22 +119,23 @@ async function reconcileCodexSessionPrompt(prompt: Prompt) {
             AND existing.prompt_id = candidates.target_prompt_id
             AND existing.tool_use_id = duplicate.tool_use_id
             AND existing.id <> duplicate.id
-        );
-
+        )`,
+      `
       WITH candidates AS (${candidates("tool_events", "timestamp")})
       UPDATE tool_events event
       SET prompt_id = candidates.target_prompt_id
       FROM candidates
-      WHERE event.id = candidates.event_id;
-
+      WHERE event.id = candidates.event_id`,
+      `
       DELETE FROM prompts stub
       WHERE stub.provider = 'codex'
         AND stub.workspace_id = (SELECT workspace_id FROM prompts WHERE id = $1::uuid)
         AND stub.session_id = (SELECT session_id FROM prompts WHERE id = $1::uuid)
         AND stub.hook_received_at IS NULL
         AND NOT EXISTS (SELECT 1 FROM api_requests WHERE prompt_id = stub.id)
-        AND NOT EXISTS (SELECT 1 FROM tool_events WHERE prompt_id = stub.id);
-    `, parameters);
+        AND NOT EXISTS (SELECT 1 FROM tool_events WHERE prompt_id = stub.id)`,
+    ];
+    for (const statement of statements) await manager.query(statement, parameters);
   });
 }
 
@@ -186,7 +189,7 @@ export async function ingestPrompt(workspaceId: string, input: PromptHook) {
 export async function ingestTool(workspaceId: string, input: ToolHook) {
   const source = await db();
   const prompt = await stub(workspaceId, input.provider, input.promptId, input.sessionId);
-  return upsertAndFind(source.getRepository(ToolEvent), {
+  const event = await upsertAndFind(source.getRepository(ToolEvent), {
     workspaceId,
     promptId: prompt.id,
     toolUseId: input.toolUseId,
@@ -199,6 +202,24 @@ export async function ingestTool(workspaceId: string, input: ToolHook) {
     promptId: prompt.id,
     toolUseId: input.toolUseId,
   });
+  const editTools = new Set(["edit", "write", "notebookedit", "apply_patch"]);
+  const accesses = input.fileAccesses ?? (input.relativeFilePath ? [{
+    kind: editTools.has(input.toolName.toLowerCase()) ? "edit" as const : "read" as const,
+    relativeFilePath: input.relativeFilePath,
+    attribution: "explicit_tool" as const,
+  }] : []);
+  for (const access of accesses) {
+    await source.getRepository(ToolFileAccess).upsert({
+      toolEventId: event.id,
+      kind: access.kind,
+      relativeFilePath: access.relativeFilePath,
+      attribution: access.attribution,
+    }, {
+      conflictPaths: ["toolEventId", "kind", "relativeFilePath"],
+      skipUpdateIfNoValuesChanged: true,
+    });
+  }
+  return event;
 }
 
 export async function ingestOtel(workspaceId: string, events: NormalizedAgentEvent[]) {

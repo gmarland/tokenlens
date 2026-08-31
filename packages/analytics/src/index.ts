@@ -54,17 +54,18 @@ export type ApiUsage = {
 export type ToolUsage = {
   toolName: string;
   relativeFilePath?: string | null;
+  fileAccessKind?: "read" | "edit" | null;
   toolResultSizeBytes: number;
   timestamp: Date;
 };
 export function aggregatePrompt(api: ApiUsage[], tools: ToolUsage[]) {
   const sum = (f: (x: ApiUsage) => number) => api.reduce((n, x) => n + f(x), 0);
   const reads = tools.filter(
-      (t) => t.toolName === "Read" && t.relativeFilePath,
+      (t) => (t.fileAccessKind === "read" || (!t.fileAccessKind && t.toolName === "Read")) && t.relativeFilePath,
     ),
     edits = tools.filter(
       (t) =>
-        ["Edit", "Write", "NotebookEdit"].includes(t.toolName) &&
+        (t.fileAccessKind === "edit" || (!t.fileAccessKind && ["Edit", "Write", "NotebookEdit"].includes(t.toolName))) &&
         t.relativeFilePath,
     ),
     uniqueReads = new Set(reads.map((x) => x.relativeFilePath));

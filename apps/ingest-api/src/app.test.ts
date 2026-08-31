@@ -77,9 +77,21 @@ describe("ingestion API", () => {
         sessionId: "session-1",
         toolUseId: "tool-1",
         toolName: "Read",
+        fileAccesses: [{
+          kind: "read",
+          relativeFilePath: "src/a.ts",
+          attribution: "explicit_tool",
+        }],
       },
     });
     expect(tool.json()).toEqual({ accepted: true });
+    expect(service.ingestTool).toHaveBeenCalledWith("workspace-1", expect.objectContaining({
+      fileAccesses: [{
+        kind: "read",
+        relativeFilePath: "src/a.ts",
+        attribution: "explicit_tool",
+      }],
+    }));
 
     const snapshot = await app.inject({
       method: "POST",

@@ -10,10 +10,11 @@ vi.mock("./index", () => ({
   RepoSnapshotFile: class RepoSnapshotFile {},
   Repository: class Repository {},
   ToolEvent: class ToolEvent {},
+  ToolFileAccess: class ToolFileAccess {},
   db: database.db,
 }));
 
-import { promptForEvent } from "./services";
+import { promptForEvent, reconcileCodexSessionPrompt } from "./services";
 
 function repository(recent: unknown, exact: unknown) {
   const query = {
@@ -83,5 +84,22 @@ describe("Codex prompt attribution", () => {
       promptId: "prompt-1",
     })).resolves.toBe(exact);
     expect(prompts.value.createQueryBuilder).not.toHaveBeenCalled();
+  });
+
+  it("executes reconciliation commands separately in one transaction", async () => {
+    const query = vi.fn(async (_statement: string, _parameters: unknown[]) => undefined);
+    database.db.mockResolvedValue({
+      transaction: (run: (manager: { query: typeof query }) => unknown) => run({ query }),
+    });
+
+    await reconcileCodexSessionPrompt({
+      id: "prompt-1",
+      provider: "codex",
+      sessionId: "session-1",
+      startedAt: new Date(),
+    } as any);
+
+    expect(query).toHaveBeenCalledTimes(5);
+    expect(query.mock.calls.every((call) => call[1]?.[0] === "prompt-1")).toBe(true);
   });
 });

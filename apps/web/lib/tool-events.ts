@@ -6,6 +6,8 @@ export type ToolEventRow = {
   tool_input_size_bytes?: number | null;
   tool_result_size_bytes?: number | null;
   relative_file_path?: string | null;
+  file_access_kind?: "read" | "edit" | null;
+  file_access_attribution?: string | null;
   timestamp?: string | Date | null;
   ingest_source?: "hook" | "otel" | "unknown" | null;
   [key: string]: unknown;

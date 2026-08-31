@@ -26,10 +26,10 @@ export default async function Prompt({ params }: any) {
   const context = fresh + cacheRead + cacheCreate;
   const cacheMetricsAvailable = api.length > 0 && api.every((x: any) => x.cache_metrics_available);
   const actions = canonicalToolActions(tools);
-  const reads = actions.filter((action) => action.category === "read").flatMap((action) => action.rows)
+  const reads = actions.flatMap((action) => action.rows).filter((row) => row.file_access_kind === "read")
     .filter((x): x is typeof x & { relative_file_path: string } => Boolean(x.relative_file_path));
   const editActions = actions.filter((action) => action.category === "edit");
-  const edits = editActions.flatMap((action) => action.rows)
+  const edits = actions.flatMap((action) => action.rows).filter((row) => row.file_access_kind === "edit")
     .filter((x): x is typeof x & { relative_file_path: string } => Boolean(x.relative_file_path));
   const group = new Map<string, any>();
   for (const r of reads) { const g = group.get(r.relative_file_path) ?? { ...r, reads: 0 }; g.reads++; group.set(r.relative_file_path, g); }
@@ -81,7 +81,7 @@ export default async function Prompt({ params }: any) {
       ["Median file LOC", compact(median(locs))], ["Largest file", compact(Math.max(0, ...locs))],
       ["Mean fan-out", (files.length ? files.reduce((n, x) => n + Number(x.dependency_fan_out ?? 0), 0) / files.length : 0).toFixed(1)],
       ["Files in cycles", String(files.filter((x) => x.in_dependency_cycle).length)],
-    ]) : <Panel><EmptyState>No file reads were observed through an explicit file tool. Files accessed inside shell commands cannot be attributed without collecting command or output contents.</EmptyState></Panel>}
+    ]) : <Panel><EmptyState>No attributable file reads were observed. Shell reads are included only when a concrete repository file can be identified locally.</EmptyState></Panel>}
     <ResponsiveTable>{files.length ? <Table><TableHead><TableRow>
       <TableCell>File</TableCell>{["LOC", "Reads", "Fan-out"].map((x) => <TableCell key={x} sx={numericCellSx}>{x}</TableCell>)}<TableCell>Module</TableCell>
     </TableRow></TableHead><TableBody>{files.sort((a, b) => b.reads - a.reads).map((f: any) => <TableRow key={f.relative_file_path} hover>

@@ -37,6 +37,11 @@ export const toolHookSchema = z.object({
   toolUseId: z.string().min(1),
   toolName: z.string().min(1).max(255),
   relativeFilePath: relativePath.optional(),
+  fileAccesses: z.array(z.object({
+    kind: z.enum(["read", "edit"]),
+    relativeFilePath: relativePath,
+    attribution: z.enum(["explicit_tool", "structured_action", "shell_operand"]),
+  })).max(100).optional(),
   timestamp: z.string().datetime().optional(),
 });
 

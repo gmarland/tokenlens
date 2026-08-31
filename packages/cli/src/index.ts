@@ -4,6 +4,7 @@ import {
   writeFile,
   mkdir,
   copyFile,
+  stat,
 } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
@@ -12,6 +13,7 @@ import { execFile } from "node:child_process";
 import { parseArgs, promisify } from "node:util";
 import { detectRepository, analyzeRepository } from "@tokenlens/repo-analyzer";
 import type { Provider } from "@tokenlens/shared";
+import { rawFileAccesses } from "./file-accesses";
 
 const exec = promisify(execFile);
 const userHome = homedir();
@@ -412,21 +414,6 @@ async function promptHook(provider: Provider) {
   }
 }
 
-function patchPaths(command: string) {
-  return [...command.matchAll(/^\*\*\* (?:Add|Update|Delete) File: (.+)$/gm)].map(
-    (m) => m[1].trim(),
-  );
-}
-
-function relativePaths(x: any, provider: Provider) {
-  const input = x.tool_input ?? {};
-  const direct = input.file_path ?? input.notebook_path ?? input.path;
-  if (direct) return [String(direct)];
-  if (provider === "codex" && (x.tool_name ?? x.toolName) === "apply_patch")
-    return patchPaths(String(input.command ?? ""));
-  return [];
-}
-
 async function toolHook(provider: Provider) {
   try {
     const x = await stdin();
@@ -436,29 +423,33 @@ async function toolHook(provider: Provider) {
       provider === "codex" ? x.turn_id ?? x.turnId : x.prompt_id ?? x.promptId;
     const sessionId = x.session_id ?? x.sessionId;
     const toolUseId = x.tool_use_id ?? x.toolUseId;
-    const raws = relativePaths(x, provider);
-    const paths: (string | undefined)[] = raws.length ? raws : [undefined];
-    let repo: Awaited<ReturnType<typeof identify>> | undefined;
-    for (const [index, raw] of paths.entries()) {
-      let relativeFilePath: string | undefined;
-      if (raw) {
-        repo ??= await identify(x.cwd ?? process.cwd());
-        const absolute = path.resolve(x.cwd ?? repo.root, raw);
-        const rel = path.relative(repo.root, absolute).split(path.sep).join("/");
-        if (rel.startsWith("../") || path.isAbsolute(rel))
-          throw new Error("tool path is outside repository");
-        relativeFilePath = rel;
-      }
-      await post("/api/ingest/tool", {
-        provider,
-        promptId,
-        sessionId,
-        toolUseId: paths.length > 1 ? `${toolUseId}:${index}` : toolUseId,
-        toolName,
-        ...(relativeFilePath ? { relativeFilePath } : {}),
-        timestamp: new Date().toISOString(),
+    const rawAccesses = rawFileAccesses(x, provider);
+    const repo = rawAccesses.length ? await identify(x.cwd ?? process.cwd()) : undefined;
+    const fileAccesses = [];
+    for (const access of rawAccesses) {
+      const absolute = path.resolve(x.cwd ?? repo!.root, access.path);
+      const relativeFilePath = path.relative(repo!.root, absolute).split(path.sep).join("/");
+      if (!relativeFilePath || relativeFilePath.startsWith("../") || path.isAbsolute(relativeFilePath))
+        continue;
+      if (access.kind === "read" && !(await stat(absolute).catch(() => null))?.isFile()) continue;
+      fileAccesses.push({
+        kind: access.kind,
+        relativeFilePath,
+        attribution: access.attribution,
       });
     }
+    const uniqueAccesses = [...new Map(fileAccesses.map((access) =>
+      [`${access.kind}:${access.relativeFilePath}`, access])).values()].slice(0, 100);
+    await post("/api/ingest/tool", {
+      provider,
+      promptId,
+      sessionId,
+      toolUseId,
+      toolName,
+      ...(uniqueAccesses[0] ? { relativeFilePath: uniqueAccesses[0].relativeFilePath } : {}),
+      ...(uniqueAccesses.length ? { fileAccesses: uniqueAccesses } : {}),
+      timestamp: new Date().toISOString(),
+    });
   } catch (e) {
     await quietLog(
       `${provider} tool hook: ${e instanceof Error ? e.message : String(e)}`,

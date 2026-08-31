@@ -36,8 +36,9 @@ export async function overview(model?: string, provider?: string) {
       from prompts p
       join lateral(select sum(input_tokens+cache_read_tokens+cache_creation_tokens) context_tokens,max(model) model
         from api_requests where prompt_id=p.id ${modelWhere})u on true
-      left join lateral(select count(distinct relative_file_path) files_read from tool_events
-        where prompt_id=p.id and tool_name='Read')t on true
+      left join lateral(select count(distinct a.relative_file_path) files_read
+        from tool_events te join tool_file_accesses a on a.tool_event_id=te.id
+        where te.prompt_id=p.id and a.kind='read')t on true
       where (${selectedModel}::text is null or u.model=${selectedModel} or (u.model is null and p.model=${selectedModel}))
         ${providerWhere(provider, repositoryParameters)} group by p.repository_id
     ), latest as(select distinct on(repository_id)* from repo_snapshots order by repository_id,captured_at desc)
@@ -77,13 +78,15 @@ export async function repository(id: string, model?: string, provider?: string) 
     left join lateral(select sum(input_tokens+cache_read_tokens+cache_creation_tokens) context_tokens,
       case when count(distinct model)>1 then 'Multiple models' else max(model) end model
       from api_requests where prompt_id=p.id ${apiModelWhere})u on true
-    left join lateral(select count(distinct te.relative_file_path)filter(where te.tool_name='Read')files_read,
-      count(*)filter(where te.tool_name='Read')-count(distinct te.relative_file_path)filter(where te.tool_name='Read')repeated_reads,
-      sum(te.tool_result_size_bytes)tool_bytes,count(distinct f.module_name)filter(where te.tool_name='Read')modules,
-      sum(distinct f.loc)filter(where te.tool_name='Read')working_loc,max(f.loc)filter(where te.tool_name='Read')max_file_loc,
-      avg(f.dependency_fan_out)filter(where te.tool_name='Read')mean_fan_out,
-      min(te.timestamp)filter(where te.tool_name in('Edit','Write','NotebookEdit'))first_edit
-      from tool_events te left join repo_snapshot_files f on f.snapshot_id=p.snapshot_id and f.path=te.relative_file_path
+    left join lateral(select count(distinct a.relative_file_path)filter(where a.kind='read')files_read,
+      count(*)filter(where a.kind='read')-count(distinct a.relative_file_path)filter(where a.kind='read')repeated_reads,
+      (select sum(tool_result_size_bytes) from tool_events where prompt_id=p.id)tool_bytes,
+      count(distinct f.module_name)filter(where a.kind='read')modules,
+      sum(distinct f.loc)filter(where a.kind='read')working_loc,max(f.loc)filter(where a.kind='read')max_file_loc,
+      avg(f.dependency_fan_out)filter(where a.kind='read')mean_fan_out,
+      min(te.timestamp)filter(where a.kind='edit' or lower(te.tool_name) in('edit','write','notebookedit','apply_patch'))first_edit
+      from tool_events te left join tool_file_accesses a on a.tool_event_id=te.id
+      left join repo_snapshot_files f on f.snapshot_id=p.snapshot_id and f.path=a.relative_file_path
       where te.prompt_id=p.id)t on true
     where p.repository_id=${repositoryId}::uuid ${promptProviderWhere}
       and (${selectedModel}::text is null or u.model=${selectedModel} or (u.model is null and p.model=${selectedModel}))
@@ -113,10 +116,12 @@ export async function repositoryPrompts(id: string, sort = "context", model?: st
     left join lateral(select case when count(distinct model)>1 then 'Multiple models' else max(model) end model,
       sum(input_tokens+cache_read_tokens+cache_creation_tokens)::bigint context_tokens,
       sum(cost_usd)::numeric cost_usd,count(*)::int api_calls from api_requests where prompt_id=p.id ${modelWhere})u on true
-    left join lateral(select count(distinct relative_file_path)filter(where tool_name='Read')::int files_read,
-      count(*)filter(where tool_name='Read')-count(distinct relative_file_path)filter(where tool_name='Read') repeated_reads,
-      count(distinct f.module_name)::int modules,min(t.timestamp)filter(where tool_name in('Edit','Write','NotebookEdit'))first_edit
-      from tool_events t left join repo_snapshot_files f on f.snapshot_id=p.snapshot_id and f.path=t.relative_file_path
+    left join lateral(select count(distinct a.relative_file_path)filter(where a.kind='read')::int files_read,
+      count(*)filter(where a.kind='read')-count(distinct a.relative_file_path)filter(where a.kind='read') repeated_reads,
+      count(distinct f.module_name)filter(where a.kind='read')::int modules,
+      min(t.timestamp)filter(where a.kind='edit' or lower(t.tool_name) in('edit','write','notebookedit','apply_patch'))first_edit
+      from tool_events t left join tool_file_accesses a on a.tool_event_id=t.id
+      left join repo_snapshot_files f on f.snapshot_id=p.snapshot_id and f.path=a.relative_file_path
       where t.prompt_id=p.id)t on true
     where p.repository_id=${repositoryId}::uuid ${providerWhere(provider, parameters)}
       and (${selectedModel}::text is null or u.model=${selectedModel} or (u.model is null and p.model=${selectedModel}))
@@ -132,9 +137,12 @@ export async function promptDetail(id: string) {
   const apiParameters = new Parameters();
   const api = await rows(`select * from api_requests where prompt_id=${apiParameters.add(id)}::uuid order by timestamp`, apiParameters);
   const toolParameters = new Parameters();
-  const tools = await rows(`select t.*,f.loc,f.module_name,f.dependency_fan_out,f.dependency_fan_in,f.in_dependency_cycle
-    from tool_events t left join prompts p on p.id=t.prompt_id left join repo_snapshot_files f
-    on f.snapshot_id=p.snapshot_id and f.path=t.relative_file_path
+  const tools = await rows(`select t.*,coalesce(a.relative_file_path,t.relative_file_path)relative_file_path,
+      a.kind file_access_kind,a.attribution file_access_attribution,
+      f.loc,f.module_name,f.dependency_fan_out,f.dependency_fan_in,f.in_dependency_cycle
+    from tool_events t left join prompts p on p.id=t.prompt_id
+    left join tool_file_accesses a on a.tool_event_id=t.id left join repo_snapshot_files f
+    on f.snapshot_id=p.snapshot_id and f.path=a.relative_file_path
     where t.prompt_id=${toolParameters.add(id)}::uuid order by t.timestamp`, toolParameters);
   return { prompt, api, tools };
 }

@@ -183,4 +183,15 @@ export class ToolEvent {
   @Column("timestamptz", { nullable: true }) timestamp!: Date | null;
 }
 
-export const entities = [Workspace, Developer, Repository, RepoSnapshot, RepoSnapshotFile, Prompt, ApiRequest, ToolEvent];
+@Entity("tool_file_accesses")
+@Index("tool_file_access_uq", ["toolEventId", "kind", "relativeFilePath"], { unique: true })
+@Index("tool_file_access_event_idx", ["toolEventId"])
+export class ToolFileAccess {
+  @PrimaryGeneratedColumn("uuid") id!: string;
+  @Column("uuid", { name: "tool_event_id" }) toolEventId!: string;
+  @Column("text") kind!: string;
+  @Column("text", { name: "relative_file_path" }) relativeFilePath!: string;
+  @Column("text") attribution!: string;
+}
+
+export const entities = [Workspace, Developer, Repository, RepoSnapshot, RepoSnapshotFile, Prompt, ApiRequest, ToolEvent, ToolFileAccess];
