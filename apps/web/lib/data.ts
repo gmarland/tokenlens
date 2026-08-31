@@ -16,11 +16,15 @@ const providerWhere = (provider: string | undefined, parameters: Parameters, ali
 
 export async function overview(model?: string, provider?: string) {
   const summaryParameters = new Parameters();
-  const summary = (await rows(`select count(distinct p.repository_id)::int repositories,
+  const summaryModelWhere = model ? `and model=${summaryParameters.add(model)}` : "";
+  const summarySelectedModel = summaryParameters.add(model ?? null);
+  const summary = (await rows(`select (select count(*)::int from repositories) repositories,
     count(distinct p.developer_id)::int developers, count(distinct p.id)::int prompts,
-    coalesce(sum(a.input_tokens+a.cache_read_tokens+a.cache_creation_tokens),0)::bigint context_tokens
-    from prompts p left join api_requests a on a.prompt_id=p.id
-    where true ${providerWhere(provider, summaryParameters)}`, summaryParameters))[0] ?? {};
+    coalesce(sum(a.context_tokens),0)::bigint context_tokens
+    from prompts p left join lateral(select sum(input_tokens+cache_read_tokens+cache_creation_tokens) context_tokens,
+      max(model) model from api_requests where prompt_id=p.id ${summaryModelWhere})a on true
+    where (${summarySelectedModel}::text is null or a.model=${summarySelectedModel} or (a.model is null and p.model=${summarySelectedModel}))
+      ${providerWhere(provider, summaryParameters)}`, summaryParameters))[0] ?? {};
 
   const repositoryParameters = new Parameters();
   const modelWhere = model ? `and model=${repositoryParameters.add(model)}` : "";
@@ -40,7 +44,7 @@ export async function overview(model?: string, provider?: string) {
     select r.id,r.name,l.source_files,l.total_source_loc loc,coalesce(u.prompts,0) prompts,
       coalesce(u.median_context,0) median_context,coalesce(u.median_files,0) median_files
     from repositories r left join latest l on l.repository_id=r.id left join usage u on u.repository_id=r.id
-    where u.repository_id is not null order by median_context desc`, repositoryParameters);
+    order by median_context desc`, repositoryParameters);
 
   const modelParameters = new Parameters();
   const models = await rows(`select a.model,count(distinct a.prompt_id)::int count
@@ -67,9 +71,11 @@ export async function repository(id: string, model?: string, provider?: string) 
     coalesce(u.context_tokens,0)::bigint context_tokens,coalesce(t.files_read,0)::int files_read,
     coalesce(t.repeated_reads,0)::int repeated_reads,coalesce(t.tool_bytes,0)::bigint tool_bytes,
     coalesce(t.modules,0)::int modules,coalesce(t.working_loc,0)::bigint working_loc,
-    coalesce(t.max_file_loc,0)::int max_file_loc,coalesce(t.mean_fan_out,0)::real mean_fan_out,t.first_edit,u.model
+    coalesce(t.max_file_loc,0)::int max_file_loc,coalesce(t.mean_fan_out,0)::real mean_fan_out,t.first_edit,
+    coalesce(u.model,p.model) model
     from prompts p
-    left join lateral(select sum(input_tokens+cache_read_tokens+cache_creation_tokens) context_tokens,max(model) model
+    left join lateral(select sum(input_tokens+cache_read_tokens+cache_creation_tokens) context_tokens,
+      case when count(distinct model)>1 then 'Multiple models' else max(model) end model
       from api_requests where prompt_id=p.id ${apiModelWhere})u on true
     left join lateral(select count(distinct te.relative_file_path)filter(where te.tool_name='Read')files_read,
       count(*)filter(where te.tool_name='Read')-count(distinct te.relative_file_path)filter(where te.tool_name='Read')repeated_reads,
@@ -101,10 +107,11 @@ export async function repositoryPrompts(id: string, sort = "context", model?: st
   const modelWhere = model ? `and model=${parameters.add(model)}` : "";
   const selectedModel = parameters.add(model ?? null);
   return rows(`select p.id,p.provider,p.external_prompt_id,p.prompt_text,p.prompt_length,p.started_at,d.email,
-    u.model,u.context_tokens,u.cost_usd,u.api_calls,t.files_read,t.modules,t.repeated_reads,
+    coalesce(u.model,p.model) model,u.context_tokens,u.cost_usd,u.api_calls,t.files_read,t.modules,t.repeated_reads,
     extract(epoch from(t.first_edit-p.started_at))*1000 time_to_first_edit_ms
     from prompts p left join developers d on d.id=p.developer_id
-    left join lateral(select max(model)model,sum(input_tokens+cache_read_tokens+cache_creation_tokens)::bigint context_tokens,
+    left join lateral(select case when count(distinct model)>1 then 'Multiple models' else max(model) end model,
+      sum(input_tokens+cache_read_tokens+cache_creation_tokens)::bigint context_tokens,
       sum(cost_usd)::numeric cost_usd,count(*)::int api_calls from api_requests where prompt_id=p.id ${modelWhere})u on true
     left join lateral(select count(distinct relative_file_path)filter(where tool_name='Read')::int files_read,
       count(*)filter(where tool_name='Read')-count(distinct relative_file_path)filter(where tool_name='Read') repeated_reads,

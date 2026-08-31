@@ -100,8 +100,9 @@ of input tokens before storage to prevent double-counting.
 
 The primary metric is input context tokens: fresh input plus cache reads and,
 where provided, cache creation. Output and cost remain separate. Correlations use
-Spearman rank correlation, require at least 20 same-model prompts within a
-repository, and are labeled as observed relationships—not causes. Cross-repository
+Spearman rank correlation, require at least 20 prompts within the current provider
+and model filter scope, and are labeled as observed relationships—not causes. With
+no filters selected, analytics include all providers and models. Cross-repository
 claims require five repositories with ten prompts each.
 
 Task complexity, developer behaviour, provider, model selection, session history,

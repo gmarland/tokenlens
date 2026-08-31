@@ -40,22 +40,100 @@ async function stub(workspaceId: string, provider: Provider, externalPromptId: s
     ["workspaceId", "provider", "externalPromptId"], { workspaceId, provider, externalPromptId });
 }
 
-async function promptForEvent(workspaceId: string, event: NormalizedAgentEvent) {
+export async function promptForEvent(workspaceId: string, event: NormalizedAgentEvent) {
   const prompts = (await db()).getRepository(Prompt);
-  const exact = await prompts.findOneBy({ workspaceId, provider: event.provider, externalPromptId: event.promptId });
-  if (exact) return exact;
-
   if (event.provider === "codex" && event.sessionId) {
     const recent = await prompts.createQueryBuilder("prompt")
       .where("prompt.workspace_id = :workspaceId", { workspaceId })
       .andWhere("prompt.provider = :provider", { provider: "codex" })
       .andWhere("prompt.session_id = :sessionId", { sessionId: event.sessionId })
+      .andWhere("prompt.hook_received_at IS NOT NULL")
       .andWhere("prompt.started_at <= :timestamp", { timestamp: event.timestamp })
       .orderBy("prompt.started_at", "DESC")
       .getOne();
     if (recent) return recent;
   }
+
+  const exact = await prompts.findOneBy({ workspaceId, provider: event.provider, externalPromptId: event.promptId });
+  if (exact) return exact;
   return stub(workspaceId, event.provider, event.promptId, event.sessionId);
+}
+
+async function reconcileCodexSessionPrompt(prompt: Prompt) {
+  if (prompt.provider !== "codex" || !prompt.sessionId || !prompt.startedAt) return;
+  const source = await db();
+  await source.transaction(async (manager) => {
+    const parameters = [prompt.id];
+    const candidates = (table: "api_requests" | "tool_events", timestamp: string) => `
+      SELECT event.id event_id, bounds.target_prompt_id
+      FROM ${table} event
+      JOIN prompts stub ON stub.id = event.prompt_id
+      CROSS JOIN LATERAL (
+        SELECT target.id target_prompt_id,
+          (SELECT min(next_prompt.started_at)
+           FROM prompts next_prompt
+           WHERE next_prompt.workspace_id = target.workspace_id
+             AND next_prompt.provider = 'codex'
+             AND next_prompt.session_id = target.session_id
+             AND next_prompt.hook_received_at IS NOT NULL
+             AND next_prompt.started_at > target.started_at) next_started_at
+        FROM prompts target
+        WHERE target.id = $1::uuid
+      ) bounds
+      WHERE stub.workspace_id = event.workspace_id
+        AND stub.provider = 'codex'
+        AND stub.session_id = (SELECT session_id FROM prompts WHERE id = $1::uuid)
+        AND stub.hook_received_at IS NULL
+        AND event.${timestamp} >= (SELECT started_at FROM prompts WHERE id = $1::uuid)
+        AND (bounds.next_started_at IS NULL OR event.${timestamp} < bounds.next_started_at)
+    `;
+
+    await manager.query(`
+      WITH candidates AS (${candidates("api_requests", "timestamp")})
+      DELETE FROM api_requests duplicate
+      USING candidates
+      WHERE duplicate.id = candidates.event_id
+        AND EXISTS (
+          SELECT 1 FROM api_requests existing
+          WHERE existing.workspace_id = duplicate.workspace_id
+            AND existing.prompt_id = candidates.target_prompt_id
+            AND existing.event_sequence = duplicate.event_sequence
+            AND existing.id <> duplicate.id
+        );
+
+      WITH candidates AS (${candidates("api_requests", "timestamp")})
+      UPDATE api_requests event
+      SET prompt_id = candidates.target_prompt_id
+      FROM candidates
+      WHERE event.id = candidates.event_id;
+
+      WITH candidates AS (${candidates("tool_events", "timestamp")})
+      DELETE FROM tool_events duplicate
+      USING candidates
+      WHERE duplicate.id = candidates.event_id
+        AND EXISTS (
+          SELECT 1 FROM tool_events existing
+          WHERE existing.workspace_id = duplicate.workspace_id
+            AND existing.prompt_id = candidates.target_prompt_id
+            AND existing.tool_use_id = duplicate.tool_use_id
+            AND existing.id <> duplicate.id
+        );
+
+      WITH candidates AS (${candidates("tool_events", "timestamp")})
+      UPDATE tool_events event
+      SET prompt_id = candidates.target_prompt_id
+      FROM candidates
+      WHERE event.id = candidates.event_id;
+
+      DELETE FROM prompts stub
+      WHERE stub.provider = 'codex'
+        AND stub.workspace_id = (SELECT workspace_id FROM prompts WHERE id = $1::uuid)
+        AND stub.session_id = (SELECT session_id FROM prompts WHERE id = $1::uuid)
+        AND stub.hook_received_at IS NULL
+        AND NOT EXISTS (SELECT 1 FROM api_requests WHERE prompt_id = stub.id)
+        AND NOT EXISTS (SELECT 1 FROM tool_events WHERE prompt_id = stub.id);
+    `, parameters);
+  });
 }
 
 export async function ingestPrompt(workspaceId: string, input: PromptHook) {
@@ -81,7 +159,7 @@ export async function ingestPrompt(workspaceId: string, input: PromptHook) {
     }
   }
 
-  return upsertAndFind(source.getRepository(Prompt), {
+  const prompt = await upsertAndFind(source.getRepository(Prompt), {
     workspaceId,
     provider: input.provider,
     externalPromptId: input.promptId,
@@ -101,6 +179,8 @@ export async function ingestPrompt(workspaceId: string, input: PromptHook) {
     provider: input.provider,
     externalPromptId: input.promptId,
   });
+  await reconcileCodexSessionPrompt(prompt);
+  return prompt;
 }
 
 export async function ingestTool(workspaceId: string, input: ToolHook) {
@@ -110,6 +190,7 @@ export async function ingestTool(workspaceId: string, input: ToolHook) {
     workspaceId,
     promptId: prompt.id,
     toolUseId: input.toolUseId,
+    ingestSource: "hook",
     toolName: input.toolName,
     relativeFilePath: input.relativeFilePath,
     timestamp: input.timestamp ? new Date(input.timestamp) : new Date(),
@@ -182,6 +263,7 @@ export async function ingestOtel(workspaceId: string, events: NormalizedAgentEve
         workspaceId,
         promptId: prompt.id,
         toolUseId: event.toolUseId,
+        ingestSource: "otel",
         toolName: event.toolName,
         success: event.success,
         durationMs: event.durationMs,

@@ -40,7 +40,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   <MuiLink component={Link} href="/" color="inherit" underline="hover" sx={{ fontSize: 13, fontWeight: 800 }}>Repositories</MuiLink>
                   <MuiLink component={Link} href="/#methodology" color="inherit" underline="hover" sx={{ fontSize: 13, fontWeight: 800 }}>Methodology</MuiLink>
                 </Box>
-                <Typography sx={{ justifySelf: "end", bgcolor: "primary.main", color: "primary.contrastText", px: 1.5, py: 0.75, fontSize: 11, fontWeight: 800 }}>Codebase profiler</Typography>
               </Toolbar>
             </AppBar>
             {children}

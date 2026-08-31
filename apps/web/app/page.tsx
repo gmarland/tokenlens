@@ -24,14 +24,9 @@ export default async function Home({ searchParams }: {
   searchParams: Promise<{ model?: string; provider?: string }>;
 }) {
   const q = await searchParams;
-  const initial = await overview(q.model, q.provider);
-  const total = initial.models.reduce((n: number, x: any) => n + x.count, 0);
-  const dominant = initial.models[0] && initial.models[0].count / total >= 0.8
-    ? initial.models[0].model
-    : undefined;
-  const selected = q.model ?? dominant;
-  const data = selected && !q.model ? await overview(selected, q.provider) : initial;
+  const data = await overview(q.model, q.provider);
   const { summary: s, repositories, models, providers } = data;
+  const scope = `${q.provider ?? "all providers"} · ${q.model ?? "all models"}`;
   const qualified = repositories.filter((r: any) => r.prompts >= 10 && r.loc);
   const rho = qualified.length >= 5
     ? spearman(
@@ -40,7 +35,7 @@ export default async function Home({ searchParams }: {
       )
     : null;
   const query = new URLSearchParams();
-  if (selected) query.set("model", selected);
+  if (q.model) query.set("model", q.model);
   if (q.provider) query.set("provider", q.provider);
 
   return (
@@ -66,17 +61,16 @@ export default async function Home({ searchParams }: {
       <Toolbar>
         <SectionTitle>Repositories</SectionTitle>
         <AnalysisFilters
-          key={`${q.provider ?? ""}:${selected ?? ""}`}
+          key={`${q.provider ?? ""}:${q.model ?? ""}`}
           idPrefix="overview"
           initialProvider={q.provider}
-          initialModel={selected}
+          initialModel={q.model}
           providers={providers.map((p: any) => ({
             value: p.provider,
             label: p.provider === "codex" ? "Codex" : "Claude Code",
           }))}
           models={models.map((m: any) => ({ value: m.model, label: m.model }))}
           modelLabel="Analysis model"
-          modelPlaceholder="Choose analysis model"
         />
       </Toolbar>
 
@@ -115,9 +109,9 @@ export default async function Home({ searchParams }: {
       <Panel>
         <ScatterPlot data={repositories.map((r: any) => ({ loc: Number(r.loc), context: Number(r.median_context) }))} x="loc" y="context" />
         {rho !== null ? (
-          <Typography sx={{ mt: 1 }}><Box component="strong">ρ = {rho.toFixed(2)}</Box> · n = {qualified.length} repositories · {relationship(rho)} for <Box component="strong">{selected}</Box>.</Typography>
+          <Typography sx={{ mt: 1 }}><Box component="strong">ρ = {rho.toFixed(2)}</Box> · n = {qualified.length} repositories · {relationship(rho)} for <Box component="strong">{scope}</Box>.</Typography>
         ) : (
-          <Label>Raw observations for {selected ?? "the selected model"} are shown. A cross-repository correlation requires at least 5 repositories with 10 prompts each.</Label>
+          <Label>Raw observations for {scope} are shown. A cross-repository correlation requires at least 5 repositories with 10 prompts each.</Label>
         )}
       </Panel>
 

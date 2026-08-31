@@ -10,11 +10,9 @@ export async function GET(
   const provider = req.nextUrl.searchParams.get("provider") ?? undefined;
   const x = await repository((await params).id, model, provider);
   if (!x) return NextResponse.json({ error: "not found" }, { status: 404 });
-  if (!model)
-    return NextResponse.json({ modelRequired: true, models: x.models, correlations: [] });
   return NextResponse.json({
-    model,
-    provider,
+    model: model ?? null,
+    provider: provider ?? null,
     n: x.prompts.length,
     correlations: correlations(
       x.prompts,

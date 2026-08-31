@@ -172,6 +172,7 @@ export class ToolEvent {
   @Column("uuid", { name: "workspace_id" }) workspaceId!: string;
   @Column("uuid", { name: "prompt_id" }) promptId!: string;
   @Column("text", { name: "tool_use_id" }) toolUseId!: string;
+  @Column("text", { name: "ingest_source", default: "unknown" }) ingestSource!: string;
   @Column("text", { name: "tool_name", nullable: true }) toolName!: string | null;
   @Column("boolean", { nullable: true }) success!: boolean | null;
   @Column("integer", { name: "duration_ms", nullable: true }) durationMs!: number | null;

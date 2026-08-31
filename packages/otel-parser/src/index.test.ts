@@ -108,6 +108,24 @@ describe("OTLP parser", () => {
     expect(got.sequence).toBe("1700000000000000000:0");
   });
 
+  it("keeps unavailable Codex tool measurements absent instead of zero", () => {
+    const [got] = parseOtlp({
+      resourceLogs: [{
+        scopeLogs: [{
+          logRecords: [record("codex.tool_result", [
+            av("tool_use_id", "call-1"),
+            av("tool_name", "exec"),
+          ])],
+        }],
+      }],
+    });
+
+    expect(got).toMatchObject({ kind: "tool_result", toolUseId: "call-1" });
+    expect(got).not.toHaveProperty("durationMs", 0);
+    expect(got).not.toHaveProperty("toolInputSizeBytes", 0);
+    expect(got).not.toHaveProperty("toolResultSizeBytes", 0);
+  });
+
   it("uses receipt time when Codex emits no usable timestamp", () => {
     const before = Date.now();
     const [got] = parseOtlp({

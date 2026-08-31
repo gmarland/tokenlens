@@ -15,7 +15,6 @@ export function AnalysisFilters({
   initialModel,
   initialProvider,
   modelLabel,
-  modelPlaceholder,
   models,
   providers,
 }: {
@@ -23,7 +22,6 @@ export function AnalysisFilters({
   initialModel?: string;
   initialProvider?: string;
   modelLabel: string;
-  modelPlaceholder: string;
   models: Option[];
   providers: Option[];
 }) {
@@ -40,13 +38,15 @@ export function AnalysisFilters({
       sx={{ width: { xs: "100%", md: "auto" } }}
     >
       <FormControl size="small" sx={{ minWidth: 145 }}>
-        <InputLabel id={`${idPrefix}-provider-label`}>Provider</InputLabel>
+        <InputLabel id={`${idPrefix}-provider-label`} shrink>Provider</InputLabel>
         <Select
+          displayEmpty
           labelId={`${idPrefix}-provider-label`}
           label="Provider"
           name="provider"
           value={provider}
           onChange={(event: SelectChangeEvent) => setProvider(event.target.value)}
+          renderValue={(value) => providers.find((option) => option.value === value)?.label ?? "All providers"}
         >
           <MenuItem value="">All providers</MenuItem>
           {providers.map((option) => (
@@ -55,15 +55,17 @@ export function AnalysisFilters({
         </Select>
       </FormControl>
       <FormControl size="small" sx={{ minWidth: 210 }}>
-        <InputLabel id={`${idPrefix}-model-label`}>{modelLabel}</InputLabel>
+        <InputLabel id={`${idPrefix}-model-label`} shrink>{modelLabel}</InputLabel>
         <Select
+          displayEmpty
           labelId={`${idPrefix}-model-label`}
           label={modelLabel}
           name="model"
           value={model}
           onChange={(event: SelectChangeEvent) => setModel(event.target.value)}
+          renderValue={(value) => models.find((option) => option.value === value)?.label ?? "All models"}
         >
-          <MenuItem value="">{modelPlaceholder}</MenuItem>
+          <MenuItem value="">All models</MenuItem>
           {models.map((option) => (
             <MenuItem value={option.value} key={option.value}>{option.label}</MenuItem>
           ))}

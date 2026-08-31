@@ -5,6 +5,8 @@ import { InitialSchema2026082900000 } from "./migrations/2026082900000-InitialSc
 import { AlwaysCapturePrompts2026083000000 } from "./migrations/2026083000000-AlwaysCapturePrompts";
 import { UpgradeLegacySchema2026083000010 } from "./migrations/2026083000010-UpgradeLegacySchema";
 import { RemoveDemoData2026083000020 } from "./migrations/2026083000020-RemoveDemoData";
+import { ReconcileCodexUsage2026083000030 } from "./migrations/2026083000030-ReconcileCodexUsage";
+import { ToolEventProvenance2026083100000 } from "./migrations/2026083100000-ToolEventProvenance";
 
 export const dataSource = new DataSource({
   type: "postgres",
@@ -15,6 +17,8 @@ export const dataSource = new DataSource({
     AlwaysCapturePrompts2026083000000,
     UpgradeLegacySchema2026083000010,
     RemoveDemoData2026083000020,
+    ReconcileCodexUsage2026083000030,
+    ToolEventProvenance2026083100000,
   ],
   migrationsRun: false,
   migrationsTableName: "typeorm_migrations",

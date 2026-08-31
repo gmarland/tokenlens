@@ -13,6 +13,7 @@ import { notFound } from "next/navigation";
 import { BackLink, Cards, EmptyState, Eyebrow, Intro, MetricCard, Page, Panel, ResponsiveTable, SectionTitle, numericCellSx } from "../../../components/ui";
 import { promptDetail } from "../../../lib/data";
 import { compact, money, duration, date } from "../../../lib/format";
+import { canonicalToolActions } from "../../../lib/tool-events";
 
 export const dynamic = "force-dynamic";
 
@@ -23,18 +24,31 @@ export default async function Prompt({ params }: any) {
   const sum = (k: string) => api.reduce((n: number, x: any) => n + Number(x[k] ?? 0), 0);
   const fresh = sum("input_tokens"), cacheRead = sum("cache_read_tokens"), cacheCreate = sum("cache_creation_tokens"), output = sum("output_tokens");
   const context = fresh + cacheRead + cacheCreate;
-  const reads = tools.filter((x: any) => x.tool_name === "Read" && x.relative_file_path);
-  const edits = tools.filter((x: any) => ["Edit", "Write", "NotebookEdit"].includes(x.tool_name) && x.relative_file_path);
+  const actions = canonicalToolActions(tools);
+  const reads = actions.filter((action) => action.category === "read").flatMap((action) => action.rows)
+    .filter((x): x is typeof x & { relative_file_path: string } => Boolean(x.relative_file_path));
+  const editActions = actions.filter((action) => action.category === "edit");
+  const edits = editActions.flatMap((action) => action.rows)
+    .filter((x): x is typeof x & { relative_file_path: string } => Boolean(x.relative_file_path));
   const group = new Map<string, any>();
   for (const r of reads) { const g = group.get(r.relative_file_path) ?? { ...r, reads: 0 }; g.reads++; group.set(r.relative_file_path, g); }
   const files = [...group.values()];
   const modules = new Set(files.map((x) => x.module_name).filter(Boolean));
   const locs = files.map((x) => Number(x.loc ?? 0));
-  const firstEdit = edits[0]?.timestamp ? +new Date(edits[0].timestamp) - +new Date(p.started_at) : null;
+  const firstEditAction = editActions.find((action) => action.timestamp);
+  const firstEdit = firstEditAction?.timestamp ? +new Date(firstEditAction.timestamp) - +new Date(p.started_at) : null;
+  const knownOutcomes = actions.filter((action) => action.success != null);
+  const knownDurations = actions.map((action) => action.durationMs).filter((value): value is number => value != null);
+  const editedFiles = new Set(edits.map((x) => x.relative_file_path));
+  const hasReadAttribution = reads.length > 0;
+  const toolTypes = new Set(actions.map((action) => action.category));
   const timeline = [
     { kind: "Prompt", timestamp: p.started_at },
     ...api.map((x: any) => ({ kind: `Model response · ${x.model ?? "model"}`, timestamp: x.timestamp })),
-    ...tools.map((x: any) => ({ kind: x.relative_file_path ? `${x.tool_name} · ${x.relative_file_path}` : x.tool_name, timestamp: x.timestamp })),
+    ...actions.map((action) => {
+      const paths = [...new Set(action.rows.map((row) => row.relative_file_path).filter(Boolean))];
+      return { kind: paths.length ? `${action.toolName} · ${paths.join(", ")}` : action.toolName, timestamp: action.timestamp };
+    }),
   ].sort((a, b) => +new Date(a.timestamp) - +new Date(b.timestamp));
   const costs = api.map((x: any) => x.cost_usd).filter((x: any) => x != null);
   const cards = (items: [string, string][]) => <Cards>{items.map(([label, value]) => <MetricCard key={label} label={label} value={value} />)}</Cards>;
@@ -49,16 +63,24 @@ export default async function Prompt({ params }: any) {
       ["Context processed", compact(context)], ["Cost", money(costs.length ? costs.reduce((n: number, x: any) => n + Number(x), 0) : null)], ["Model responses", String(api.length)],
     ])}
     <SectionTitle>Agent behaviour</SectionTitle>{cards([
-      ["Tool calls", String(tools.length)], ["Files read", String(files.length)], ["Repeated reads", String(reads.length - files.length)],
-      ["Files edited", String(new Set(edits.map((x: any) => x.relative_file_path)).size)], ["Modules visited", String(modules.size)],
-      ["Tool result bytes", compact(tools.reduce((n: number, x: any) => n + Number(x.tool_result_size_bytes ?? 0), 0))], ["Time to first edit", duration(firstEdit)],
+      ["Tool calls", String(actions.length)],
+      ["Successful", knownOutcomes.length ? String(knownOutcomes.filter((action) => action.success).length) : "—"],
+      ["Failed", knownOutcomes.length ? String(knownOutcomes.filter((action) => !action.success).length) : "—"],
+      ["Shell calls", String(actions.filter((action) => action.category === "shell").length)],
+      ["Tool types", String(toolTypes.size)],
+      ["Tool time", duration(knownDurations.length ? knownDurations.reduce((sum, value) => sum + value, 0) : null)],
+      ["Observed files read", hasReadAttribution ? String(files.length) : "—"],
+      ["Repeated observed reads", hasReadAttribution ? String(reads.length - files.length) : "—"],
+      ["Observed files edited", editActions.length ? (editedFiles.size ? String(editedFiles.size) : "—") : "0"],
+      ["Modules visited", hasReadAttribution ? String(modules.size) : "—"],
+      ["Time to first edit", duration(firstEdit)],
     ])}
-    <SectionTitle>Working set</SectionTitle>{cards([
+    <SectionTitle>Working set</SectionTitle>{files.length ? cards([
       ["Working-set LOC", compact(locs.reduce((a, b) => a + b, 0))], ["Mean file LOC", compact(locs.length ? locs.reduce((a, b) => a + b, 0) / locs.length : 0)],
       ["Median file LOC", compact(median(locs))], ["Largest file", compact(Math.max(0, ...locs))],
       ["Mean fan-out", (files.length ? files.reduce((n, x) => n + Number(x.dependency_fan_out ?? 0), 0) / files.length : 0).toFixed(1)],
       ["Files in cycles", String(files.filter((x) => x.in_dependency_cycle).length)],
-    ])}
+    ]) : <Panel><EmptyState>No file reads were observed through an explicit file tool. Files accessed inside shell commands cannot be attributed without collecting command or output contents.</EmptyState></Panel>}
     <ResponsiveTable>{files.length ? <Table><TableHead><TableRow>
       <TableCell>File</TableCell>{["LOC", "Reads", "Fan-out"].map((x) => <TableCell key={x} sx={numericCellSx}>{x}</TableCell>)}<TableCell>Module</TableCell>
     </TableRow></TableHead><TableBody>{files.sort((a, b) => b.reads - a.reads).map((f: any) => <TableRow key={f.relative_file_path} hover>

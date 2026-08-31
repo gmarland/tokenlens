@@ -119,6 +119,9 @@ importers:
       '@tokenlens/shared':
         specifier: workspace:*
         version: link:../shared
+      dotenv:
+        specifier: ^17.0.0
+        version: 17.4.2
       pg:
         specifier: 8.16.3
         version: 8.16.3

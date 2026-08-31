@@ -19,6 +19,11 @@ const pick = (a: AnyRecord, ...keys: string[]) => {
   for (const k of keys) if (a[k] !== undefined) return a[k];
 };
 const num = (x: any) => Number(x ?? 0) || 0;
+const optionalNum = (x: any) => {
+  if (x === undefined || x === null || x === "") return undefined;
+  const parsed = Number(x);
+  return Number.isFinite(parsed) ? parsed : undefined;
+};
 const str = (x: any) => (x == null ? undefined : String(x));
 
 function recordTimeUnixNano(record: AnyRecord): bigint {
@@ -69,9 +74,9 @@ export type NormalizedAgentEvent =
       toolUseId: string;
       toolName?: string;
       success?: boolean;
-      durationMs: number;
-      toolInputSizeBytes: number;
-      toolResultSizeBytes: number;
+      durationMs?: number;
+      toolInputSizeBytes?: number;
+      toolResultSizeBytes?: number;
     })
   | (Base & { kind: "api_error" });
 
@@ -162,9 +167,9 @@ function parseClaude(
       toolUseId,
       toolName: str(a.tool_name),
       success: a.success === undefined ? undefined : Boolean(a.success),
-      durationMs: num(a.duration_ms),
-      toolInputSizeBytes: num(a.tool_input_size_bytes),
-      toolResultSizeBytes: num(a.tool_result_size_bytes),
+      durationMs: optionalNum(a.duration_ms),
+      toolInputSizeBytes: optionalNum(a.tool_input_size_bytes),
+      toolResultSizeBytes: optionalNum(a.tool_result_size_bytes),
     };
   }
   if (name === "claude_code.user_prompt")
@@ -229,9 +234,9 @@ function parseCodex(
       toolUseId,
       toolName: str(pick(a, "tool_name", "tool", "gen_ai.tool.name")),
       success: a.success === undefined ? undefined : Boolean(a.success),
-      durationMs: num(pick(a, "duration_ms", "duration.ms")),
-      toolInputSizeBytes: num(a.tool_input_size_bytes),
-      toolResultSizeBytes: num(
+      durationMs: optionalNum(pick(a, "duration_ms", "duration.ms")),
+      toolInputSizeBytes: optionalNum(a.tool_input_size_bytes),
+      toolResultSizeBytes: optionalNum(
         pick(a, "tool_result_size_bytes", "output_size_bytes"),
       ),
     };

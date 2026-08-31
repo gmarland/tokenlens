@@ -17,12 +17,9 @@ export default async function Repo({ params, searchParams }: any) {
   const q = await searchParams;
   const data = await repository(id, q.model, q.provider);
   if (!data) notFound();
-  const p = data.prompts;
+  const rs = data.prompts;
   const s = data.repo.snapshot ?? {};
-  const modelTotal = data.models.reduce((n: number, x: any) => n + x.count, 0);
-  const dominant = data.models[0] && data.models[0].count / modelTotal >= 0.8 ? data.models[0].model : undefined;
-  const selected = q.model ?? dominant;
-  const rs = selected === q.model || !q.model ? p : await repository(id, selected, q.provider).then((x) => x?.prompts ?? []);
+  const scope = `${q.provider ?? "all providers"} · ${q.model ?? "all models"}`;
   const nums = (k: string) => rs.map((x: any) => Number(x[k] ?? 0));
   const corr = correlations(rs, (x: any) => Number(x.context_tokens), {
     "Working-set LOC": (x) => Number(x.working_loc), "Largest file read": (x) => Number(x.max_file_loc),
@@ -31,27 +28,26 @@ export default async function Repo({ params, searchParams }: any) {
     "Tool-result size": (x) => Number(x.tool_bytes),
   });
   const promptQuery = new URLSearchParams();
-  if (selected) promptQuery.set("model", selected);
+  if (q.model) promptQuery.set("model", q.model);
   if (q.provider) promptQuery.set("provider", q.provider);
 
   return <Page>
     <BackLink href="/">← All repositories</BackLink>
     <Toolbar>
       <Box sx={{ mt: 3 }}><Eyebrow>Repository</Eyebrow><Typography variant="h1">{data.repo.name}</Typography>
-        <Intro>Observed structure and coding-agent behaviour. Analysis model: <Box component="strong">{selected ?? "select a model"}</Box></Intro>
+        <Intro>Observed structure and coding-agent behaviour. Analysis scope: <Box component="strong">{scope}</Box></Intro>
       </Box>
       <AnalysisFilters
-        key={`${q.provider ?? ""}:${selected ?? ""}`}
+        key={`${q.provider ?? ""}:${q.model ?? ""}`}
         idPrefix="repository"
         initialProvider={q.provider}
-        initialModel={selected}
+        initialModel={q.model}
         providers={data.providers.map((provider: any) => ({
           value: provider.provider,
           label: provider.provider === "codex" ? "Codex" : "Claude Code",
         }))}
         models={data.models.map((model: any) => ({ value: model.model, label: model.model }))}
         modelLabel="Model"
-        modelPlaceholder="Choose model"
       />
     </Toolbar>
     <Cards>
@@ -76,9 +72,9 @@ export default async function Repo({ params, searchParams }: any) {
       <StatCard label="Languages" value={Object.entries(s.language_distribution_json ?? {}).map(([k, v]: any) => `${k} ${compact(v.loc)}`).join(", ") || "—"} />
     </Cards>
     <SectionTitle>Observed relationships</SectionTitle>
-    {selected && corr.length ? <Cards compact>{corr.map((c) => <Card variant="outlined" key={c.name}><CardContent>
+    {corr.length ? <Cards compact>{corr.map((c) => <Card variant="outlined" key={c.name}><CardContent>
       <Label>{c.name} ↔ context processed</Label><Typography sx={{ fontSize: 30, fontWeight: 800, letterSpacing: "-.04em", color: "info.main" }}>ρ = {c.rho!.toFixed(2)}</Typography>
       <Typography>{relationship(c.rho!)}</Typography><Label>n = {c.n} prompts · descriptive, not causal</Label>
-    </CardContent></Card>)}</Cards> : <Panel><EmptyState>{!selected ? "Select one model; models are not mixed in correlation analysis." : `At least 20 prompts for ${selected} are required before correlations are displayed.`}</EmptyState></Panel>}
+    </CardContent></Card>)}</Cards> : <Panel><EmptyState>At least 20 prompts matching the current filters are required before correlations are displayed.</EmptyState></Panel>}
   </Page>;
 }
