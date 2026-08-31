@@ -57,6 +57,7 @@ export function SeriesTrend({
   return <Box sx={{ width: "100%", minWidth: 0 }}>
     <LineChart
       height={280}
+      hideLegend
       xAxis={[{ data: dates, scaleType: "point" }]}
       yAxis={[{ label }]}
       series={series.map((item) => ({
