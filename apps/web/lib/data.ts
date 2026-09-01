@@ -14,6 +14,8 @@ const rows = async (query: string, parameters: Parameters) =>
 const providerWhere = (provider: string | undefined, parameters: Parameters, alias = "p") =>
   provider ? `and ${alias}.provider = ${parameters.add(provider)}` : "";
 
+const escapeLikePattern = (value: string) => value.replace(/[\\%_]/g, "\\$&");
+
 export async function overview(model?: string, provider?: string) {
   const summaryParameters = new Parameters();
   const summaryModelWhere = model ? `and model=${summaryParameters.add(model)}` : "";
@@ -137,13 +139,24 @@ export async function repository(id: string, model?: string, provider?: string) 
   return { repo, snapshots, commits, prompts: promptRows, models, providers };
 }
 
-export async function repositoryPrompts(id: string, sort = "context", model?: string, provider?: string) {
+export async function repositoryPrompts(
+  id: string,
+  sort = "context",
+  model?: string,
+  provider?: string,
+  search?: string,
+) {
   const order = ({ context: "context_tokens desc", cost: "cost_usd desc nulls last", files: "files_read desc",
     repeated: "repeated_reads desc", edit: "time_to_first_edit_ms desc" } as Record<string, string>)[sort] ?? "started_at desc";
   const parameters = new Parameters();
   const repositoryId = parameters.add(id);
   const modelWhere = model ? `and model=${parameters.add(model)}` : "";
   const selectedModel = parameters.add(model ?? null);
+  const promptProviderWhere = providerWhere(provider, parameters);
+  const normalizedSearch = search?.trim();
+  const promptSearchWhere = normalizedSearch
+    ? `and p.prompt_text ilike ${parameters.add(`%${escapeLikePattern(normalizedSearch)}%`)} escape '\\'`
+    : "";
   return rows(`select p.id,p.provider,p.external_prompt_id,p.prompt_text,p.prompt_length,p.started_at,d.email,
     coalesce(u.model,p.model) model,u.context_tokens,u.cost_usd,u.api_calls,t.files_read,t.modules,t.repeated_reads,
     extract(epoch from(t.first_edit-p.started_at))*1000 time_to_first_edit_ms
@@ -158,7 +171,7 @@ export async function repositoryPrompts(id: string, sort = "context", model?: st
       from tool_events t left join tool_file_accesses a on a.tool_event_id=t.id
       left join repo_snapshot_files f on f.snapshot_id=p.snapshot_id and f.path=a.relative_file_path
       where t.prompt_id=p.id)t on true
-    where p.repository_id=${repositoryId}::uuid ${providerWhere(provider, parameters)}
+    where p.repository_id=${repositoryId}::uuid ${promptProviderWhere} ${promptSearchWhere}
       and (${selectedModel}::text is null or u.model=${selectedModel} or (u.model is null and p.model=${selectedModel}))
     order by ${order}`, parameters);
 }

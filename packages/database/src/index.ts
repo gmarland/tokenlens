@@ -10,6 +10,7 @@ import { ToolEventProvenance2026083100000 } from "./migrations/2026083100000-Too
 import { CacheMetricAvailability2026083100010 } from "./migrations/2026083100010-CacheMetricAvailability";
 import { ToolFileAccesses2026083100020 } from "./migrations/2026083100020-ToolFileAccesses";
 import { RepoCommits2026083100030 } from "./migrations/2026083100030-RepoCommits";
+import { PromptSearchIndex2026090100000 } from "./migrations/2026090100000-PromptSearchIndex";
 
 export const dataSource = new DataSource({
   type: "postgres",
@@ -29,6 +30,7 @@ export const dataSource = new DataSource({
     CacheMetricAvailability2026083100010,
     ToolFileAccesses2026083100020,
     RepoCommits2026083100030,
+    PromptSearchIndex2026090100000,
   ],
   migrationsRun: false,
   migrationsTableName: "typeorm_migrations",

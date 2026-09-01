@@ -12,6 +12,7 @@ export async function GET(
       q.get("sort") ?? undefined,
       q.get("model") ?? undefined,
       q.get("provider") ?? undefined,
+      q.get("search") ?? undefined,
     ),
   );
 }

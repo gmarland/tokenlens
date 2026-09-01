@@ -56,12 +56,14 @@ function TableGrid({
   columns,
   initialState,
   minWidth = 760,
+  showToolbar = true,
 }: {
   label: string;
   rows: GridRowsProp;
   columns: GridColDef[];
   initialState?: GridInitialState;
   minWidth?: number;
+  showToolbar?: boolean;
 }) {
   return (
     <Paper
@@ -80,7 +82,7 @@ function TableGrid({
         pagination
         rowSelection={false}
         rows={rows}
-        showToolbar
+        showToolbar={showToolbar}
         slotProps={{
           toolbar: {
             csvOptions: { fileName: label.toLowerCase().replaceAll(" ", "-") },
@@ -241,6 +243,7 @@ export function PromptsDataTable({
         sorting: { sortModel: [{ field: promptSortFields[initialSort] ?? "context", sort: "desc" }] },
       }}
       minWidth={1700}
+      showToolbar={false}
     />
   );
 }

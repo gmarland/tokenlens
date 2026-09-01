@@ -7,7 +7,7 @@ const { dbMock, queryMock } = vi.hoisted(() => ({
 
 vi.mock("@tokenlens/database", () => ({ db: dbMock }));
 
-import { repository } from "./data";
+import { repository, repositoryPrompts } from "./data";
 
 describe("repository structure history", () => {
   beforeEach(() => {
@@ -67,5 +67,38 @@ describe("repository structure history", () => {
     expect(queryMock.mock.calls[1][1]).toEqual(["repo-1"]);
     expect(queryMock.mock.calls[2][0]).toContain("from repo_commits");
     expect(queryMock.mock.calls[2][1]).toEqual(["repo-1"]);
+  });
+});
+
+describe("repository prompt search", () => {
+  beforeEach(() => {
+    dbMock.mockReset();
+    queryMock.mockReset();
+    dbMock.mockResolvedValue({ query: queryMock });
+  });
+
+  it("searches full prompt bodies with a parameterized, case-insensitive literal pattern", async () => {
+    queryMock.mockResolvedValueOnce([]);
+
+    await repositoryPrompts("repo-1", "context", "gpt-test", "codex", "  Fix 100%_done\\path  ");
+
+    expect(queryMock).toHaveBeenCalledOnce();
+    expect(queryMock.mock.calls[0][0]).toContain("p.prompt_text ilike $5 escape '\\'");
+    expect(queryMock.mock.calls[0][1]).toEqual([
+      "repo-1",
+      "gpt-test",
+      "gpt-test",
+      "codex",
+      "%Fix 100\\%\\_done\\\\path%",
+    ]);
+  });
+
+  it("does not add a prompt predicate for an empty search", async () => {
+    queryMock.mockResolvedValueOnce([]);
+
+    await repositoryPrompts("repo-1", "context", undefined, undefined, "   ");
+
+    expect(queryMock.mock.calls[0][0]).not.toContain("prompt_text ilike");
+    expect(queryMock.mock.calls[0][1]).toEqual(["repo-1", null]);
   });
 });
