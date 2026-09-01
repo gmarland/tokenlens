@@ -17,6 +17,8 @@ export function AnalysisFilters({
   modelLabel,
   models,
   providers,
+  initialRange,
+  showTimeRange = false,
 }: {
   idPrefix: string;
   initialModel?: string;
@@ -24,9 +26,12 @@ export function AnalysisFilters({
   modelLabel: string;
   models: Option[];
   providers: Option[];
+  initialRange?: string;
+  showTimeRange?: boolean;
 }) {
   const [provider, setProvider] = useState(initialProvider ?? "");
   const [model, setModel] = useState(initialModel ?? "");
+  const [range, setRange] = useState(initialRange ?? "all");
 
   return (
     <Stack
@@ -71,6 +76,21 @@ export function AnalysisFilters({
           ))}
         </Select>
       </FormControl>
+      {showTimeRange ? <FormControl size="small" sx={{ minWidth: 130 }}>
+        <InputLabel id={`${idPrefix}-range-label`}>Time range</InputLabel>
+        <Select
+          labelId={`${idPrefix}-range-label`}
+          label="Time range"
+          name="range"
+          value={range}
+          onChange={(event: SelectChangeEvent) => setRange(event.target.value)}
+        >
+          <MenuItem value="all">All time</MenuItem>
+          <MenuItem value="7d">Last 7 days</MenuItem>
+          <MenuItem value="30d">Last 30 days</MenuItem>
+          <MenuItem value="90d">Last 90 days</MenuItem>
+        </Select>
+      </FormControl> : null}
       <Button type="submit" variant="contained">Apply</Button>
     </Stack>
   );

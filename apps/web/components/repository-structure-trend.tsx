@@ -129,6 +129,22 @@ export function RepositoryStructureTrend({
         "Modules",
         trend.snapshots.map((snapshot) => snapshot.modules),
       )}
+      {chart(
+        "Dependency cycles",
+        trend.snapshots.map((snapshot) => snapshot.dependencyCycleCount ?? 0),
+      )}
+      {chart(
+        "Cross-module edge ratio (%)",
+        trend.snapshots.map((snapshot) => (snapshot.crossModuleEdgeRatio ?? 0) * 100),
+      )}
+      {chart(
+        "Dependency fan-out p95",
+        trend.snapshots.map((snapshot) => snapshot.p95FanOut ?? 0),
+      )}
+      {chart(
+        "Agent instruction bytes",
+        trend.snapshots.map((snapshot) => snapshot.instructionBytes ?? 0),
+      )}
     </>
   );
 }

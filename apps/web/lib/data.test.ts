@@ -62,6 +62,13 @@ describe("repository structure history", () => {
       totalSourceLoc: 12500,
       sourceFiles: 84,
       modules: 7,
+      filesOver500Loc: 0,
+      filesOver1000Loc: 0,
+      dependencyCycleCount: 0,
+      crossModuleEdgeRatio: 0,
+      p95FanOut: 0,
+      testToSourceRatio: 0,
+      instructionBytes: 0,
     }]);
     expect(result?.commits[0]).toMatchObject({
       sha: "a".repeat(40),

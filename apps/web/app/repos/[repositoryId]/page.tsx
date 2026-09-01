@@ -5,6 +5,9 @@ import Typography from "@mui/material/Typography";
 import { correlations, median, relationship } from "@tokenlens/analytics";
 import { notFound } from "next/navigation";
 import { AnalysisFilters } from "../../../components/filters";
+import { InsightCards } from "../../../components/insight-cards";
+import { ContextComposition } from "../../../components/context-composition";
+import { RepositoryNav } from "../../../components/repository-nav";
 import { RepositoryTimelines } from "../../../components/repository-timelines";
 import {
   BackLink,
@@ -21,6 +24,7 @@ import {
   Toolbar,
 } from "../../../components/ui";
 import { repository } from "../../../lib/data";
+import { repositoryInsightBundle } from "../../../lib/insights";
 import { compact, duration } from "../../../lib/format";
 
 export const dynamic = "force-dynamic";
@@ -28,7 +32,10 @@ export const dynamic = "force-dynamic";
 export default async function Repo({ params, searchParams }: any) {
   const id = (await params).repositoryId;
   const q = await searchParams;
-  const data = await repository(id, q.model, q.provider);
+  const [data, insightBundle] = await Promise.all([
+    repository(id, q.model, q.provider),
+    repositoryInsightBundle(id, { model: q.model, provider: q.provider }),
+  ]);
   if (!data) notFound();
   const rs = data.prompts;
   const s = data.repo.snapshot ?? {};
@@ -79,6 +86,7 @@ export default async function Repo({ params, searchParams }: any) {
           modelLabel="Model"
         />
       </Toolbar>
+      <RepositoryNav repositoryId={id} queryString={promptQuery.toString()} />
       <Cards>
         <MetricCard label="Source LOC" value={compact(s.total_source_loc)} />
         <MetricCard label="Source files" value={compact(s.source_files)} />
@@ -106,6 +114,10 @@ export default async function Repo({ params, searchParams }: any) {
           )}
         />
       </Cards>
+      <SectionTitle>Recommended actions</SectionTitle>
+      <Panel><InsightCards insights={insightBundle.insights.filter((insight) => !["dismissed", "resolved"].includes(insight.state ?? "new")).slice(0, 3)} /></Panel>
+      <SectionTitle>Context composition</SectionTitle>
+      <Panel><ContextComposition facts={insightBundle.facts} /></Panel>
       <RepositoryTimelines
         behaviourKey={`${q.provider ?? ""}:${q.model ?? ""}`}
         promptHref={`/repos/${id}/prompts${promptQuery.size ? `?${promptQuery}` : ""}`}
@@ -121,6 +133,7 @@ export default async function Repo({ params, searchParams }: any) {
         snapshots={data.snapshots}
         commits={data.commits}
       />
+      <Box id="repository-structure" sx={{ scrollMarginTop: 16 }}>
       <SectionTitle>Repository structure</SectionTitle>
       <Cards compact>
         <StatCard
@@ -164,6 +177,7 @@ export default async function Repo({ params, searchParams }: any) {
           }
         />
       </Cards>
+      </Box>
       <SectionTitle>Observed relationships</SectionTitle>
       {corr.length ? (
         <Cards compact>

@@ -351,6 +351,7 @@ export async function ingestSnapshot(workspaceId: string, input: SnapshotUpload)
     claudeMdTotalBytes: metrics.claudeMdTotalBytes,
     agentsMdCount: metrics.agentsMdCount ?? 0,
     agentsMdTotalBytes: metrics.agentsMdTotalBytes ?? 0,
+    instructionFingerprint: metrics.instructionFingerprint ?? null,
     generatedFileCount: metrics.generatedFileCount,
     generatedFileBytes: metrics.generatedFileBytes,
     dependencyGraphNodes: metrics.dependencyGraphNodes,

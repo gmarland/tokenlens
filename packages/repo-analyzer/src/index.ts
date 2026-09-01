@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
 import { promisify } from "node:util";
 import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
@@ -305,6 +306,10 @@ export async function analyzeRepository(root: string) {
     agents = base.filter(
       (f) => path.basename(f.path).toLowerCase() === "agents.md",
     ),
+    instructionFingerprint = createHash("sha256").update([...claudes, ...agents]
+      .sort((a, b) => a.path.localeCompare(b.path))
+      .map((f) => `${f.path}\0${createHash("sha256").update(f.text).digest("hex")}`)
+      .join("\0")).digest("hex"),
     generated = base.filter((f) => f.isGenerated);
   return {
     metrics: {
@@ -333,6 +338,7 @@ export async function analyzeRepository(root: string) {
       claudeMdTotalBytes: claudes.reduce((n, f) => n + f.bytes, 0),
       agentsMdCount: agents.length,
       agentsMdTotalBytes: agents.reduce((n, f) => n + f.bytes, 0),
+      instructionFingerprint,
       generatedFileCount: generated.length,
       generatedFileBytes: generated.reduce((n, f) => n + f.bytes, 0),
       dependencyGraphNodes: edges.size,

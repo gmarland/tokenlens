@@ -7,6 +7,7 @@ import Typography from "@mui/material/Typography";
 import { BackLink, EmptyState, Eyebrow, Page, Panel } from "../../../../components/ui";
 import Link from "../../../../components/link";
 import { repositoryBenchmarks } from "../../../../lib/data";
+import { benchmarkInsight } from "../../../../lib/insights";
 import { compact, date } from "../../../../lib/format";
 
 export const dynamic = "force-dynamic";
@@ -14,6 +15,10 @@ export const dynamic = "force-dynamic";
 export default async function Benchmarks({ params }: { params: Promise<{ repositoryId: string }> }) {
   const repositoryId = (await params).repositoryId;
   const benchmarks = await repositoryBenchmarks(repositoryId);
+  const health = new Map((await Promise.all(benchmarks.map(async (benchmark: any) => {
+    const result = await benchmarkInsight(String(benchmark.id));
+    return [String(benchmark.id), Boolean(result?.insights.length)] as const;
+  }))));
 
   return <Page>
     <BackLink href={`/repos/${repositoryId}`}>← Repository</BackLink>
@@ -32,6 +37,7 @@ export default async function Benchmarks({ params }: { params: Promise<{ reposit
             <Box sx={{ display: "flex", gap: 1, mt: 1.5 }}>
               <Chip label={benchmark.provider} size="small" />
               <Chip label={benchmark.model} size="small" />
+              {health.get(String(benchmark.id)) ? <Chip color="warning" label="Regression" size="small" /> : null}
             </Box>
           </Box>
           <Box sx={{ textAlign: "right" }}>

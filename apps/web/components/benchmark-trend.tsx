@@ -14,6 +14,9 @@ export type BenchmarkPoint = {
   id: string;
   startedAt: string;
   contextTokens: number;
+  freshInputTokens: number;
+  cacheReadTokens: number;
+  cacheCreationTokens: number;
   outputTokens: number;
   costUsd: number | null;
   responseDurationMs: number;
@@ -29,6 +32,9 @@ export type BenchmarkPoint = {
 
 const metrics = {
   contextTokens: { label: "Context tokens", axis: "Tokens" },
+  freshInputTokens: { label: "Fresh input", axis: "Tokens" },
+  cacheReadTokens: { label: "Cache read", axis: "Tokens" },
+  cacheCreationTokens: { label: "Cache creation", axis: "Tokens" },
   outputTokens: { label: "Output tokens", axis: "Tokens" },
   responseDurationMs: { label: "Model response duration", axis: "Milliseconds" },
   costUsd: { label: "Cost", axis: "USD" },

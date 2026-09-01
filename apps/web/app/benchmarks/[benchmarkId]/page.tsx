@@ -6,16 +6,18 @@ import Typography from "@mui/material/Typography";
 import { median } from "@tokenlens/analytics";
 import { notFound } from "next/navigation";
 import { BenchmarkTrend, type BenchmarkPoint } from "../../../components/benchmark-trend";
+import { InsightCards } from "../../../components/insight-cards";
 import Link from "../../../components/link";
 import { BackLink, Cards, EmptyState, Eyebrow, MetricCard, Page, Panel, SectionTitle } from "../../../components/ui";
-import { benchmarkDetail } from "../../../lib/data";
+import { benchmarkInsight } from "../../../lib/insights";
 import { compact, date, duration, money } from "../../../lib/format";
 
 export const dynamic = "force-dynamic";
 
 export default async function BenchmarkPage({ params }: { params: Promise<{ benchmarkId: string }> }) {
-  const data = await benchmarkDetail((await params).benchmarkId);
-  if (!data) notFound();
+  const result = await benchmarkInsight((await params).benchmarkId);
+  if (!result) notFound();
+  const { detail: data, insights } = result;
   const benchmark = data.benchmark;
   const points = data.points as BenchmarkPoint[];
   const complete = points.filter((point) => !point.provisional);
@@ -36,9 +38,11 @@ export default async function BenchmarkPage({ params }: { params: Promise<{ benc
       <Chip label={benchmark.provider} size="small" />
       <Chip label={benchmark.model} size="small" />
     </Stack>
+    <Box sx={{ mt: 2 }}><BackLink href={`/repos/${benchmark.repository_id}/comparisons`}>Compare matched models →</BackLink></Box>
     <Typography color="text.secondary" sx={{ mt: 2, maxWidth: 800, whiteSpace: "pre-wrap" }}>
       {benchmark.prompt_text}
     </Typography>
+    {insights.length ? <><SectionTitle>Regression detected</SectionTitle><Panel><InsightCards insights={insights} /></Panel></> : null}
     <Cards>
       <MetricCard label="Observations" value={compact(points.length)} />
       <MetricCard label="Median context" value={compact(median(values("contextTokens")))} />

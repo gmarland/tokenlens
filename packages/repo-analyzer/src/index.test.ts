@@ -36,6 +36,11 @@ describe("repository analysis", () => {
     expect(x.metrics.packageCount).toBe(1);
     expect(x.metrics.agentsMdCount).toBe(1);
     expect(x.metrics.agentsMdTotalBytes).toBeGreaterThan(0);
+    const fingerprint = x.metrics.instructionFingerprint;
+    await writeFile(path.join(root, "AGENTS.md"), "# Different instructions!\n");
+    const changed = await analyzeRepository(root);
+    expect(changed.metrics.agentsMdTotalBytes).toBe(x.metrics.agentsMdTotalBytes);
+    expect(changed.metrics.instructionFingerprint).not.toBe(fingerprint);
     expect(x.metrics.dependencyGraphEdges).toBe(2);
     expect(x.metrics.dependencyCycleCount).toBe(1);
     expect(x.files.every((f) => f.inDependencyCycle)).toBe(true);
