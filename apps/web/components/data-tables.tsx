@@ -32,7 +32,11 @@ const gridSx = {
     letterSpacing: ".09em",
     textTransform: "uppercase",
   },
-  "& .MuiDataGrid-columnHeader .MuiIconButton-root": { color: "inherit" },
+  "& .MuiDataGrid-columnHeader .MuiIconButton-root": {
+    bgcolor: "transparent",
+    color: "inherit",
+    "&:hover": { bgcolor: "rgba(255,255,255,.12)" },
+  },
   "& .MuiDataGrid-cell": { borderColor: "divider" },
   "& .MuiDataGrid-row:hover": { bgcolor: "rgba(255,255,0,.1)" },
   "& .MuiDataGrid-columnHeader:focus, & .MuiDataGrid-columnHeader:focus-within, & .MuiDataGrid-cell:focus, & .MuiDataGrid-cell:focus-within": {
