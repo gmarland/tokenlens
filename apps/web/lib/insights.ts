@@ -26,8 +26,12 @@ import { benchmarkDetail, repositoryBenchmarks } from "./data";
 import type { PromptBenchmarkSummary } from "../components/prompt-benchmarks";
 
 const severity = { warning: 0, opportunity: 1, info: 2 } as const;
-const sorted = (insights: Insight[]) => [...insights].sort((a, b) =>
-  severity[a.severity] - severity[b.severity] || b.confidence.localeCompare(a.confidence) || a.title.localeCompare(b.title));
+const confidence = { high: 0, medium: 1, low: 2 } as const;
+export const sortInsights = (insights: Insight[]) => [...insights].sort((a, b) =>
+  severity[a.severity] - severity[b.severity]
+  || Number(b.rule === "benchmark-context-regression") - Number(a.rule === "benchmark-context-regression")
+  || confidence[a.confidence] - confidence[b.confidence]
+  || a.title.localeCompare(b.title));
 
 export function scopedInsightFilter(input: { provider?: string; model?: string; branch?: string; range?: string }): AnalyticsFilter {
   const days = input.range === "7d" ? 7 : input.range === "30d" ? 30 : input.range === "90d" ? 90 : null;
@@ -41,11 +45,12 @@ export function scopedInsightFilter(input: { provider?: string; model?: string; 
 
 export async function repositoryInsightBundle(repositoryId: string, filter: AnalyticsFilter = {}) {
   const facts = await repositoryPromptFacts(repositoryId, filter);
-  const [hotspots, tools, snapshots, states] = await Promise.all([
+  const [hotspots, tools, snapshots, states, benchmarkDetails] = await Promise.all([
     repositoryFileHotspots(repositoryId, facts),
     repositoryToolHealth(facts),
     repositorySnapshotDeltas(repositoryId),
     repositoryInsightStates(repositoryId),
+    repositoryBenchmarkDetails(repositoryId, filter),
   ]);
   const scope = { repositoryId, provider: filter.provider, model: filter.model, branch: filter.branch, startAt: filter.startAt };
   const comparisonCandidates = matchedModelComparisons(facts);
@@ -56,7 +61,17 @@ export async function repositoryInsightBundle(repositoryId: string, filter: Anal
   );
   const comparisons = comparisonCandidates.filter((comparison) => (comparisonVariants.get(comparison.promptFingerprint) ?? 0) >= 2);
   const onboarding = onboardingInsight(facts, scope);
-  const insights = sorted([
+  const benchmarkInsights = benchmarkDetails.flatMap((detail) => {
+    if (!detail) return [];
+    const insight = benchmarkRegressionForDetail(detail);
+    return insight ? [{
+      ...insight,
+      title: `${detail.benchmark.name} benchmark has regressed`,
+      state: states[insight.id] ?? "new" as const,
+    }] : [];
+  });
+  const insights = sortInsights([
+    ...benchmarkInsights,
     ...explorationInsights(facts, scope),
     ...architectureInsights(facts, scope),
     ...hotspotInsights(hotspots, scope),
@@ -71,9 +86,17 @@ export async function repositoryInsightBundle(repositoryId: string, filter: Anal
   return { insights, facts, hotspots, tools, snapshots, comparisons };
 }
 
-export async function benchmarkInsight(benchmarkId: string) {
-  const detail = await benchmarkDetail(benchmarkId);
-  if (!detail) return null;
+async function repositoryBenchmarkDetails(repositoryId: string, filter: AnalyticsFilter) {
+  const benchmarks = await repositoryBenchmarks(repositoryId);
+  return Promise.all(benchmarks
+    .filter((benchmark: any) => (!filter.provider || benchmark.provider === filter.provider)
+      && (!filter.model || benchmark.model === filter.model))
+    .map((benchmark: any) => benchmarkDetail(String(benchmark.id))));
+}
+
+type BenchmarkDetail = NonNullable<Awaited<ReturnType<typeof benchmarkDetail>>>;
+
+function benchmarkRegressionForDetail(detail: BenchmarkDetail) {
   const runs: BenchmarkFact[] = detail.points.map((point: any) => ({
     id: point.id,
     startedAt: point.startedAt,
@@ -91,12 +114,18 @@ export async function benchmarkInsight(benchmarkId: string) {
     timeToFirstEditMs: point.timeToFirstEditMs,
     headSha: point.headSha,
   }));
-  const insight = benchmarkRegressionInsight(runs, {
+  return benchmarkRegressionInsight(runs, {
     repositoryId: detail.benchmark.repository_id,
-    benchmarkId,
+    benchmarkId: detail.benchmark.id,
     provider: detail.benchmark.provider,
     model: detail.benchmark.model,
   });
+}
+
+export async function benchmarkInsight(benchmarkId: string) {
+  const detail = await benchmarkDetail(benchmarkId);
+  if (!detail) return null;
+  const insight = benchmarkRegressionForDetail(detail);
   const states = await repositoryInsightStates(detail.benchmark.repository_id);
   return { detail, insights: insight ? [{ ...insight, state: states[insight.id] ?? "new" as const }] : [] };
 }

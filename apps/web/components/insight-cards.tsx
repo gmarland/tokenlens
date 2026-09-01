@@ -21,14 +21,20 @@ function evidenceValue(value: number | string, unit?: string) {
 export function InsightCards({
   insights,
   empty = "No actionable insights meet the evidence thresholds yet.",
+  repositoryNames,
 }: {
   insights: Insight[];
   empty?: string;
+  repositoryNames?: Readonly<Record<string, string>>;
 }) {
   if (!insights.length) return <EmptyState>{empty}</EmptyState>;
   return (
     <Stack spacing={2}>
-      {insights.map((insight) => (
+      {insights.map((insight) => {
+        const repositoryName = insight.scope.repositoryId
+          ? repositoryNames?.[insight.scope.repositoryId]
+          : undefined;
+        return (
         <Alert
           key={insight.id}
           severity={
@@ -59,6 +65,16 @@ export function InsightCards({
                 <Chip size="small" label={`${insight.confidence} confidence`} />
               </Stack>
               <Typography sx={{ mt: 0.5 }}>{insight.summary}</Typography>
+              {repositoryName ? (
+                <Stack direction="row" sx={{ gap: 1, alignItems: "baseline", mt: 1 }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
+                    Source repository
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 800 }}>
+                    {repositoryName}
+                  </Typography>
+                </Stack>
+              ) : null}
             </Box>
             {insight.recommendation.href ? (
               <Button
@@ -197,7 +213,8 @@ export function InsightCards({
             />
           ) : null}
         </Alert>
-      ))}
+        );
+      })}
     </Stack>
   );
 }

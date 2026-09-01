@@ -6,6 +6,7 @@ test("shows analytics across all providers and models by default", async ({ page
   await expect(page.getByRole("combobox", { name: "Provider" })).toContainText("All providers");
   await expect(page.getByRole("combobox", { name: "Analysis model" })).toContainText("All models");
   await expect(page.getByRole("heading", { name: "Action centre" })).toBeVisible();
+  await expect(page.getByRole("alert").first().getByText("Source repository")).toBeVisible();
 });
 
 test("surfaces repository actions and diagnostic navigation", async ({ page }) => {
@@ -15,7 +16,7 @@ test("surfaces repository actions and diagnostic navigation", async ({ page }) =
   await expect(page.getByRole("heading", { name: "Recommended actions" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Prompt benchmarks" })).toBeHidden();
   await expect(page.getByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true");
-  await expect(page.getByRole("tab", { name: "Insights" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Insights" })).toHaveCount(0);
   await expect(page.getByRole("tab", { name: "Hotspots" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "Model comparisons" })).toBeVisible();
 

@@ -16,7 +16,6 @@ export function RepositoryNav({ repositoryId, queryString = "" }: { repositoryId
     { value: "benchmarks", label: "Benchmarks", href: `${base}/benchmarks` },
     { value: "behaviour", label: "Agent behaviour", href: `${base}/behaviour` },
     { value: "structure", label: "Structure", href: `${base}/structure` },
-    { value: "insights", label: "Insights", href: `${base}/insights` },
     { value: "prompts", label: "Prompts", href: `${base}/prompts` },
     { value: "hotspots", label: "Hotspots", href: `${base}/hotspots` },
     { value: "tools", label: "Tool health", href: `${base}/tools` },

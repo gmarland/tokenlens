@@ -11,7 +11,7 @@ import {
   SectionTitle, Toolbar,
 } from "../components/ui";
 import { overview } from "../lib/data";
-import { repositoryInsightBundle } from "../lib/insights";
+import { repositoryInsightBundle, sortInsights } from "../lib/insights";
 import { compact } from "../lib/format";
 
 export const dynamic = "force-dynamic";
@@ -33,13 +33,17 @@ export default async function Home({ searchParams }: {
   const query = new URLSearchParams();
   if (q.model) query.set("model", q.model);
   if (q.provider) query.set("provider", q.provider);
-  const actionCentre = (await Promise.all(repositories.slice(0, 10).map(async (repository: any) => {
+  const repositoryNames = Object.fromEntries(repositories.map((repository: any) => [
+    String(repository.id),
+    String(repository.name),
+  ]));
+  const actionCentre = sortInsights((await Promise.all(repositories.slice(0, 10).map(async (repository: any) => {
     const bundle = await repositoryInsightBundle(repository.id, { model: q.model, provider: q.provider });
     return bundle.insights.filter((insight) => !["dismissed", "resolved"].includes(insight.state ?? "new")).map((insight) => ({
       ...insight,
       recommendation: { ...insight.recommendation, href: insight.recommendation.href ?? `/repos/${repository.id}/insights${query.size ? `?${query}` : ""}` },
     }));
-  }))).flat().slice(0, 5);
+  }))).flat()).slice(0, 5);
 
   return (
     <Page>
@@ -62,7 +66,7 @@ export default async function Home({ searchParams }: {
       </Cards>
 
       <SectionTitle>Action centre</SectionTitle>
-      <Panel><InsightCards insights={actionCentre} empty="No repository insights currently meet the evidence thresholds." /></Panel>
+      <Panel><InsightCards insights={actionCentre} repositoryNames={repositoryNames} empty="No repository insights currently meet the evidence thresholds." /></Panel>
 
       <Toolbar>
         <SectionTitle>Repositories</SectionTitle>
