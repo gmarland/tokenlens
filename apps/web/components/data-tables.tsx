@@ -34,7 +34,15 @@ const gridSx = {
   },
   "& .MuiDataGrid-columnHeader .MuiIconButton-root": { color: "inherit" },
   "& .MuiDataGrid-cell": { borderColor: "divider" },
-  "& .MuiDataGrid-row:hover": { bgcolor: "rgba(255,255,0,.22)" },
+  "& .MuiDataGrid-row:hover": { bgcolor: "rgba(255,255,0,.1)" },
+  "& .MuiDataGrid-columnHeader:focus, & .MuiDataGrid-columnHeader:focus-within, & .MuiDataGrid-cell:focus, & .MuiDataGrid-cell:focus-within": {
+    outline: "none",
+  },
+  "& .MuiDataGrid-columnHeader:focus-visible, & .MuiDataGrid-cell:focus-visible": {
+    outline: "2px solid",
+    outlineColor: "info.main",
+    outlineOffset: "-2px",
+  },
   "& .MuiDataGrid-cell--textRight": { fontVariantNumeric: "tabular-nums" },
 } as const;
 
@@ -60,13 +68,13 @@ function TableGrid({
         aria-label={label}
         autoHeight
         columns={columns}
-        disableRowSelectionOnClick
         initialState={{
           pagination: { paginationModel: { page: 0, pageSize: 25 } },
           ...initialState,
         }}
         pageSizeOptions={[10, 25, 50, 100]}
         pagination
+        rowSelection={false}
         rows={rows}
         showToolbar
         slotProps={{
