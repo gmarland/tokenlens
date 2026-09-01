@@ -139,7 +139,7 @@ export function RepositoriesDataTable({
     { field: "medianFiles", headerName: "Files read", type: "number", minWidth: 120, valueFormatter: (value) => Number(value).toFixed(1) },
   ];
 
-  return <TableGrid label="Repositories" rows={rows} columns={columns} />;
+  return <TableGrid label="Repositories" rows={rows} columns={columns} showToolbar={false} />;
 }
 
 export type FileReadTableRow = {

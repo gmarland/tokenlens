@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import Button from "@mui/material/Button";
 import FormControl from "@mui/material/FormControl";
 import InputLabel from "@mui/material/InputLabel";
@@ -48,7 +48,7 @@ export function AnalysisFilters({
           displayEmpty
           labelId={`${idPrefix}-provider-label`}
           label="Provider"
-          name="provider"
+          name={provider ? "provider" : undefined}
           value={provider}
           onChange={(event: SelectChangeEvent) => setProvider(event.target.value)}
           renderValue={(value) => providers.find((option) => option.value === value)?.label ?? "All providers"}
@@ -65,7 +65,7 @@ export function AnalysisFilters({
           displayEmpty
           labelId={`${idPrefix}-model-label`}
           label={modelLabel}
-          name="model"
+          name={model ? "model" : undefined}
           value={model}
           onChange={(event: SelectChangeEvent) => setModel(event.target.value)}
           renderValue={(value) => models.find((option) => option.value === value)?.label ?? "All models"}
