@@ -7,27 +7,30 @@ import type { RepositoryCommit, RepositoryStructureSnapshot } from "./repository
 import { RepositoryTimeFilterProvider } from "./repository-time-filters";
 import { BackLink, Panel, SectionTitle, Toolbar } from "./ui";
 
-export function RepositoryTimelines({
+export function RepositoryBehaviourTimeline({
   prompts,
-  snapshots,
-  commits,
   promptHref,
   behaviourKey,
 }: {
   prompts: AgentBehaviourPrompt[];
-  snapshots: RepositoryStructureSnapshot[];
-  commits: RepositoryCommit[];
   promptHref: string;
   behaviourKey: string;
 }) {
-  return <>
-    <RepositoryTimeFilterProvider key={`behaviour:${behaviourKey}`} timestamps={prompts.map((prompt) => prompt.startedAt)}>
-      <Toolbar><SectionTitle>Agent behaviour</SectionTitle><BackLink href={promptHref}>Explore prompts →</BackLink></Toolbar>
-      <Panel><AgentBehaviour prompts={prompts} /></Panel>
-    </RepositoryTimeFilterProvider>
-    <RepositoryTimeFilterProvider key="structure" timestamps={snapshots.map((snapshot) => snapshot.capturedAt)}>
-      <SectionTitle>Repository structure over time</SectionTitle>
-      <Panel><RepositoryStructureTrend snapshots={snapshots} commits={commits} /></Panel>
-    </RepositoryTimeFilterProvider>
-  </>;
+  return <RepositoryTimeFilterProvider key={`behaviour:${behaviourKey}`} timestamps={prompts.map((prompt) => prompt.startedAt)}>
+    <Toolbar><SectionTitle>Agent behaviour over time</SectionTitle><BackLink href={promptHref}>Explore prompts →</BackLink></Toolbar>
+    <Panel><AgentBehaviour prompts={prompts} /></Panel>
+  </RepositoryTimeFilterProvider>;
+}
+
+export function RepositoryStructureTimeline({
+  snapshots,
+  commits,
+}: {
+  snapshots: RepositoryStructureSnapshot[];
+  commits: RepositoryCommit[];
+}) {
+  return <RepositoryTimeFilterProvider key="structure" timestamps={snapshots.map((snapshot) => snapshot.capturedAt)}>
+    <SectionTitle>Repository structure over time</SectionTitle>
+    <Panel><RepositoryStructureTrend snapshots={snapshots} commits={commits} /></Panel>
+  </RepositoryTimeFilterProvider>;
 }

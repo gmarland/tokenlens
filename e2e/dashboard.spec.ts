@@ -13,11 +13,25 @@ test("surfaces repository actions and diagnostic navigation", async ({ page }) =
   const repository = page.getByRole("grid", { name: "Repositories" }).getByRole("link", { name: "tokenlens", exact: true });
   await repository.click();
   await expect(page.getByRole("heading", { name: "Recommended actions" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Prompt benchmarks" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Benchmarks", exact: true })).toHaveAttribute("href", /#prompt-benchmarks$/);
-  await expect(page.getByRole("link", { name: "Insights" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Hotspots" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Model comparisons" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Prompt benchmarks" })).toBeHidden();
+  await expect(page.getByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("tab", { name: "Insights" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Hotspots" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Model comparisons" })).toBeVisible();
+
+  const repositoryUrl = new URL(page.url());
+  await page.getByRole("tab", { name: "Benchmarks" }).click();
+  await expect(page).toHaveURL(new URL(`${repositoryUrl.pathname}/benchmarks`, repositoryUrl).toString());
+  await expect(page.getByRole("tab", { name: "Benchmarks" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("heading", { name: /Prompt benchmarks/ })).toBeVisible();
+
+  await page.getByRole("tab", { name: "Agent behaviour" }).click();
+  await expect(page).toHaveURL(new URL(`${repositoryUrl.pathname}/behaviour`, repositoryUrl).toString());
+  await expect(page.getByRole("heading", { name: "Observed relationships" })).toBeVisible();
+
+  await page.getByRole("tab", { name: "Structure" }).click();
+  await expect(page).toHaveURL(new URL(`${repositoryUrl.pathname}/structure`, repositoryUrl).toString());
+  await expect(page.getByRole("heading", { name: "Current structure" })).toBeVisible();
 });
 
 test("shows a complete actionable example and links to its evidence", async ({ page, request }) => {

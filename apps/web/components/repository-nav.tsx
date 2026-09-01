@@ -1,15 +1,46 @@
-import Stack from "@mui/material/Stack";
-import { BackLink } from "./ui";
+"use client";
+
+import Box from "@mui/material/Box";
+import Tab from "@mui/material/Tab";
+import Tabs from "@mui/material/Tabs";
+import { usePathname } from "next/navigation";
+import Link from "./link";
 
 export function RepositoryNav({ repositoryId, queryString = "" }: { repositoryId: string; queryString?: string }) {
+  const pathname = usePathname();
   const suffix = queryString ? (queryString.startsWith("?") ? queryString : `?${queryString}`) : "";
-  return <Stack direction="row" sx={{ gap: 2, flexWrap: "wrap", my: 2 }}>
-    <BackLink href={`/repos/${repositoryId}${suffix}`}>Overview</BackLink>
-    <BackLink href={`/repos/${repositoryId}/insights${suffix}`}>Insights</BackLink>
-    <BackLink href={`/repos/${repositoryId}/prompts${suffix}`}>Prompts</BackLink>
-    <BackLink href={`/repos/${repositoryId}${suffix}#prompt-benchmarks`}>Benchmarks</BackLink>
-    <BackLink href={`/repos/${repositoryId}/hotspots${suffix}`}>Hotspots</BackLink>
-    <BackLink href={`/repos/${repositoryId}/tools${suffix}`}>Tool health</BackLink>
-    <BackLink href={`/repos/${repositoryId}/comparisons`}>Model comparisons</BackLink>
-  </Stack>;
+  const base = `/repos/${repositoryId}`;
+  const activeTab = pathname === base ? "overview" : pathname.slice(base.length + 1).split("/")[0];
+  const tabs = [
+    { value: "overview", label: "Overview", href: base },
+    { value: "benchmarks", label: "Benchmarks", href: `${base}/benchmarks` },
+    { value: "behaviour", label: "Agent behaviour", href: `${base}/behaviour` },
+    { value: "structure", label: "Structure", href: `${base}/structure` },
+    { value: "insights", label: "Insights", href: `${base}/insights` },
+    { value: "prompts", label: "Prompts", href: `${base}/prompts` },
+    { value: "hotspots", label: "Hotspots", href: `${base}/hotspots` },
+    { value: "tools", label: "Tool health", href: `${base}/tools` },
+    { value: "comparisons", label: "Model comparisons", href: `${base}/comparisons` },
+  ];
+
+  return <Box component="nav" aria-label="Repository sections" sx={{ borderBottom: 1, borderColor: "divider", my: 3 }}>
+    <Tabs
+      value={tabs.some((tab) => tab.value === activeTab) ? activeTab : false}
+      aria-label="Repository sections"
+      variant="scrollable"
+      scrollButtons="auto"
+      allowScrollButtonsMobile
+    >
+      {tabs.map((tab) => (
+        <Tab
+          component={Link}
+          href={`${tab.href}${suffix}`}
+          key={tab.value}
+          label={tab.label}
+          value={tab.value}
+          sx={{ fontWeight: 800, minHeight: 52 }}
+        />
+      ))}
+    </Tabs>
+  </Box>;
 }

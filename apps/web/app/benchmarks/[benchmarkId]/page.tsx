@@ -31,7 +31,7 @@ export default async function BenchmarkPage({ params }: { params: Promise<{ benc
   const contextChange = baseline && latestContext != null ? ((latestContext - baseline) / baseline) * 100 : null;
 
   return <Page>
-    <BackLink href={`/repos/${benchmark.repository_id}#prompt-benchmarks`}>← Benchmarks</BackLink>
+    <BackLink href={`/repos/${benchmark.repository_id}/benchmarks`}>← Benchmarks</BackLink>
     <Eyebrow sx={{ mt: 3 }}>{benchmark.repository_name}</Eyebrow>
     <Typography variant="h1">{benchmark.name}</Typography>
     <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
