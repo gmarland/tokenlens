@@ -11,6 +11,7 @@ import { CacheMetricAvailability2026083100010 } from "./migrations/2026083100010
 import { ToolFileAccesses2026083100020 } from "./migrations/2026083100020-ToolFileAccesses";
 import { RepoCommits2026083100030 } from "./migrations/2026083100030-RepoCommits";
 import { PromptSearchIndex2026090100000 } from "./migrations/2026090100000-PromptSearchIndex";
+import { PromptBenchmarks2026090100010 } from "./migrations/2026090100010-PromptBenchmarks";
 
 export const dataSource = new DataSource({
   type: "postgres",
@@ -31,6 +32,7 @@ export const dataSource = new DataSource({
     ToolFileAccesses2026083100020,
     RepoCommits2026083100030,
     PromptSearchIndex2026090100000,
+    PromptBenchmarks2026090100010,
   ],
   migrationsRun: false,
   migrationsTableName: "typeorm_migrations",
@@ -49,3 +51,4 @@ export function db(): Promise<DataSource> {
 }
 
 export * from "./entities";
+export * from "./prompt-fingerprint";

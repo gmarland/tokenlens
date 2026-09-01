@@ -152,12 +152,34 @@ export class Prompt {
   @Column("uuid", { name: "snapshot_id", nullable: true }) snapshotId!: string | null;
   @Column("integer", { name: "prompt_length", nullable: true }) promptLength!: number | null;
   @Column("text", { name: "prompt_text", nullable: true }) promptText!: string | null;
+  @Column("text", { name: "prompt_fingerprint", nullable: true }) promptFingerprint!: string | null;
   @Column("text", { nullable: true }) model!: string | null;
   @Column("text", { nullable: true }) branch!: string | null;
   @Column("text", { name: "head_sha", nullable: true }) headSha!: string | null;
   @Column("boolean", { nullable: true }) dirty!: boolean | null;
   @Column("timestamptz", { name: "started_at", nullable: true }) startedAt!: Date | null;
   @Column("timestamptz", { name: "hook_received_at", nullable: true }) hookReceivedAt!: Date | null;
+}
+
+@Entity("prompt_benchmarks")
+@Index("prompt_benchmark_repository_idx", ["repositoryId"])
+@Index("prompt_benchmark_active_match_uq", ["repositoryId", "provider", "model", "promptFingerprint"], {
+  unique: true,
+  where: "archived_at IS NULL",
+})
+export class PromptBenchmark {
+  @PrimaryGeneratedColumn("uuid") id!: string;
+  @Column("uuid", { name: "workspace_id" }) workspaceId!: string;
+  @Column("uuid", { name: "repository_id" }) repositoryId!: string;
+  @Column("uuid", { name: "source_prompt_id", nullable: true }) sourcePromptId!: string | null;
+  @Column("text") name!: string;
+  @Column("text") provider!: string;
+  @Column("text") model!: string;
+  @Column("text", { name: "prompt_text" }) promptText!: string;
+  @Column("text", { name: "prompt_fingerprint" }) promptFingerprint!: string;
+  @Column("integer", { name: "matcher_version", default: 1 }) matcherVersion!: number;
+  @CreateDateColumn({ name: "created_at", type: "timestamptz" }) createdAt!: Date;
+  @Column("timestamptz", { name: "archived_at", nullable: true }) archivedAt!: Date | null;
 }
 
 @Entity("api_requests")
@@ -211,4 +233,4 @@ export class ToolFileAccess {
   @Column("text") attribution!: string;
 }
 
-export const entities = [Workspace, Developer, Repository, RepoSnapshot, RepoSnapshotFile, RepoCommit, Prompt, ApiRequest, ToolEvent, ToolFileAccess];
+export const entities = [Workspace, Developer, Repository, RepoSnapshot, RepoSnapshotFile, RepoCommit, Prompt, PromptBenchmark, ApiRequest, ToolEvent, ToolFileAccess];

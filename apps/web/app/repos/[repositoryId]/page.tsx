@@ -59,6 +59,9 @@ export default async function Repo({ params, searchParams }: any) {
             Observed structure and coding-agent behaviour. Analysis scope:{" "}
             <Box component="strong">{scope}</Box>
           </Intro>
+          <Box sx={{ mt: 2 }}>
+            <BackLink href={`/repos/${id}/benchmarks`}>View prompt benchmarks →</BackLink>
+          </Box>
         </Box>
         <AnalysisFilters
           key={`${q.provider ?? ""}:${q.model ?? ""}`}

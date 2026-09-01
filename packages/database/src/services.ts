@@ -13,6 +13,7 @@ import {
 } from "./index";
 import type { PromptHook, ToolHook, SnapshotUpload, Provider } from "@tokenlens/shared";
 import type { NormalizedAgentEvent } from "@tokenlens/otel-parser";
+import { promptFingerprint } from "./prompt-fingerprint";
 
 async function upsertAndFind<T extends ObjectLiteral>(
   repository: TypeOrmRepository<T>,
@@ -172,6 +173,7 @@ export async function ingestPrompt(workspaceId: string, input: PromptHook) {
     snapshotId,
     promptLength: input.promptLength,
     promptText: input.promptText,
+    promptFingerprint: promptFingerprint(input.promptText),
     model: input.model,
     branch: input.branch,
     headSha: input.headSha,

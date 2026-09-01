@@ -79,6 +79,12 @@ Prompt capture is always enabled. Both providers send the prompt body and its
 character length; provider telemetry is used to attribute prompts to the
 developer who owns the session.
 
+Captured prompts with a single resolved model can be saved as benchmarks from
+their detail page. TokenLens matches the same prompt text, provider, repository,
+and model across historical and future turns, then plots usage and agent
+behaviour over time. Matching normalizes line endings only; case and all other
+whitespace remain significant.
+
 ## Privacy and security
 
 The server receives provider, prompt/session identifiers, prompt text and
@@ -108,6 +114,10 @@ claims require five repositories with ten prompts each.
 
 Task complexity, developer behaviour, provider, model selection, session history,
 and tools also affect token usage. This MVP cannot control for them.
+
+Prompt benchmarks measure observed token usage, duration, cost availability,
+tool activity, and file-access behaviour. They do not score response correctness
+or quality because assistant response contents are not collected.
 
 ## Commands and tests
 

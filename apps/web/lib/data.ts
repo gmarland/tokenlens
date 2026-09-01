@@ -195,6 +195,156 @@ export async function promptDetail(id: string) {
   return { prompt, api, tools };
 }
 
+export class BenchmarkValidationError extends Error {
+  constructor(message: string, readonly status = 400) {
+    super(message);
+  }
+}
+
+const normalizedPromptSql = (alias: string) =>
+  `replace(replace(${alias}.prompt_text, E'\\r\\n', E'\\n'), E'\\r', E'\\n')`;
+
+export async function createPromptBenchmark(
+  repositoryId: string,
+  sourcePromptId: string,
+  requestedModel?: string,
+  requestedName?: string,
+) {
+  const sourceParameters = new Parameters();
+  const source = (await rows(`select p.id,p.workspace_id,p.repository_id,p.provider,p.prompt_text,p.prompt_fingerprint,
+      case when count(distinct coalesce(a.model,p.model)) <= 1
+        then max(coalesce(a.model,p.model)) end effective_model,
+      count(distinct coalesce(a.model,p.model))::int model_count
+    from prompts p left join api_requests a on a.prompt_id=p.id
+    where p.id=${sourceParameters.add(sourcePromptId)}::uuid
+      and p.repository_id=${sourceParameters.add(repositoryId)}::uuid
+    group by p.id`, sourceParameters))[0];
+
+  if (!source) throw new BenchmarkValidationError("Prompt not found in this repository", 404);
+  if (!source.prompt_text || !source.prompt_fingerprint) {
+    throw new BenchmarkValidationError("This prompt has no captured text and cannot be benchmarked");
+  }
+  if (Number(source.model_count) > 1) {
+    throw new BenchmarkValidationError("Prompts that used multiple models cannot be benchmarked");
+  }
+  if (!source.effective_model) {
+    throw new BenchmarkValidationError("Model telemetry has not arrived for this prompt");
+  }
+  const model = requestedModel?.trim() || String(source.effective_model);
+  if (model !== source.effective_model) {
+    throw new BenchmarkValidationError("The selected model does not match this prompt");
+  }
+  const fallbackName = String(source.prompt_text).replace(/\s+/g, " ").trim().slice(0, 80) || "Benchmark prompt";
+  const name = requestedName?.trim().slice(0, 120) || fallbackName;
+
+  const insertParameters = new Parameters();
+  return (await rows(`insert into prompt_benchmarks(
+      workspace_id,repository_id,source_prompt_id,name,provider,model,prompt_text,prompt_fingerprint,matcher_version
+    ) values(
+      ${insertParameters.add(source.workspace_id)}::uuid,${insertParameters.add(repositoryId)}::uuid,
+      ${insertParameters.add(sourcePromptId)}::uuid,${insertParameters.add(name)},${insertParameters.add(source.provider)},
+      ${insertParameters.add(model)},${insertParameters.add(source.prompt_text)},${insertParameters.add(source.prompt_fingerprint)},1
+    ) on conflict(repository_id,provider,model,prompt_fingerprint) where archived_at is null
+      do update set name=prompt_benchmarks.name
+    returning id,name,model,provider`, insertParameters))[0];
+}
+
+export async function repositoryBenchmarks(repositoryId: string) {
+  const parameters = new Parameters();
+  return rows(`select b.id,b.name,b.provider,b.model,b.created_at,
+      coalesce(s.runs,0)::int runs,s.last_seen_at,s.median_context
+    from prompt_benchmarks b
+    left join lateral(
+      select count(*)::int runs,max(run.started_at) last_seen_at,
+        percentile_cont(.5) within group(order by run.context_tokens) median_context
+      from (
+        select p.started_at,coalesce(u.context_tokens,0)::bigint context_tokens
+        from prompts p
+        left join lateral(
+          select sum(input_tokens+cache_read_tokens+cache_creation_tokens)::bigint context_tokens,
+            max(coalesce(model,p.model)) model,
+            count(distinct coalesce(model,p.model))::int model_count
+          from api_requests where prompt_id=p.id
+        )u on true
+        where p.repository_id=b.repository_id and p.provider=b.provider
+          and p.prompt_fingerprint=b.prompt_fingerprint
+          and ${normalizedPromptSql("p")}=replace(replace(b.prompt_text,E'\\r\\n',E'\\n'),E'\\r',E'\\n')
+          and u.model_count <= 1 and coalesce(u.model,p.model)=b.model
+      )run
+    )s on true
+    where b.repository_id=${parameters.add(repositoryId)}::uuid and b.archived_at is null
+    order by s.last_seen_at desc nulls last,b.created_at desc`, parameters);
+}
+
+export async function benchmarkDetail(id: string) {
+  const benchmarkParameters = new Parameters();
+  const benchmark = (await rows(`select b.*,r.name repository_name
+    from prompt_benchmarks b join repositories r on r.id=b.repository_id
+    where b.id=${benchmarkParameters.add(id)}::uuid and b.archived_at is null`, benchmarkParameters))[0];
+  if (!benchmark) return null;
+
+  const pointParameters = new Parameters();
+  const points = (await rows(`select p.id,p.started_at,p.branch,p.head_sha,p.dirty,
+      coalesce(u.context_tokens,0)::bigint context_tokens,coalesce(u.output_tokens,0)::bigint output_tokens,
+      u.cost_usd,coalesce(u.duration_ms,0)::bigint response_duration_ms,coalesce(u.api_calls,0)::int api_calls,
+      coalesce(t.tool_calls,0)::int tool_calls,coalesce(t.failed_tools,0)::int failed_tools,
+      coalesce(t.files_read,0)::int files_read,coalesce(t.files_edited,0)::int files_edited,
+      coalesce(t.repeated_reads,0)::int repeated_reads,t.time_to_first_edit_ms,
+      greatest(p.hook_received_at,u.last_api_at,t.last_tool_at) > now()-interval '5 minutes' provisional
+    from prompts p
+    left join lateral(
+      select sum(input_tokens+cache_read_tokens+cache_creation_tokens)::bigint context_tokens,
+        sum(output_tokens)::bigint output_tokens,sum(cost_usd)::numeric cost_usd,
+        sum(duration_ms)::bigint duration_ms,count(*)::int api_calls,max(timestamp) last_api_at,
+        max(coalesce(model,p.model)) model,count(distinct coalesce(model,p.model))::int model_count
+      from api_requests where prompt_id=p.id
+    )u on true
+    left join lateral(
+      select count(distinct te.id)::int tool_calls,
+        count(distinct te.id)filter(where te.success=false)::int failed_tools,
+        count(distinct a.relative_file_path)filter(where a.kind='read')::int files_read,
+        count(distinct a.relative_file_path)filter(where a.kind='edit')::int files_edited,
+        (count(*)filter(where a.kind='read')-count(distinct a.relative_file_path)filter(where a.kind='read'))::int repeated_reads,
+        extract(epoch from(min(te.timestamp)filter(where a.kind='edit' or lower(te.tool_name) in('edit','write','notebookedit','apply_patch'))-p.started_at))*1000 time_to_first_edit_ms,
+        max(te.timestamp) last_tool_at
+      from tool_events te left join tool_file_accesses a on a.tool_event_id=te.id where te.prompt_id=p.id
+    )t on true
+    where p.repository_id=${pointParameters.add(benchmark.repository_id)}::uuid
+      and p.provider=${pointParameters.add(benchmark.provider)}
+      and p.prompt_fingerprint=${pointParameters.add(benchmark.prompt_fingerprint)}
+      and ${normalizedPromptSql("p")}=${pointParameters.add(
+        String(benchmark.prompt_text).replace(/\r\n?/g, "\n"),
+      )}
+      and u.model_count <= 1 and coalesce(u.model,p.model)=${pointParameters.add(benchmark.model)}
+    order by p.started_at,p.id`, pointParameters)).map((point) => ({
+      id: String(point.id),
+      startedAt: new Date(point.started_at).toISOString(),
+      branch: point.branch == null ? null : String(point.branch),
+      headSha: point.head_sha == null ? null : String(point.head_sha),
+      dirty: point.dirty == null ? null : Boolean(point.dirty),
+      contextTokens: Number(point.context_tokens ?? 0),
+      outputTokens: Number(point.output_tokens ?? 0),
+      costUsd: point.cost_usd == null ? null : Number(point.cost_usd),
+      responseDurationMs: Number(point.response_duration_ms ?? 0),
+      apiCalls: Number(point.api_calls ?? 0),
+      toolCalls: Number(point.tool_calls ?? 0),
+      failedTools: Number(point.failed_tools ?? 0),
+      filesRead: Number(point.files_read ?? 0),
+      filesEdited: Number(point.files_edited ?? 0),
+      repeatedReads: Number(point.repeated_reads ?? 0),
+      timeToFirstEditMs: point.time_to_first_edit_ms == null ? null : Number(point.time_to_first_edit_ms),
+      provisional: Boolean(point.provisional),
+    }));
+
+  return { benchmark, points };
+}
+
+export async function archiveBenchmark(id: string) {
+  const parameters = new Parameters();
+  return (await rows(`update prompt_benchmarks set archived_at=now()
+    where id=${parameters.add(id)}::uuid and archived_at is null returning id,repository_id`, parameters))[0] ?? null;
+}
+
 export async function developersList() {
   return rows(`select d.*,count(p.id)::int prompts from developers d left join prompts p on p.developer_id=d.id
     group by d.id order by d.last_seen_at desc`, new Parameters());
