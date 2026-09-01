@@ -14,7 +14,6 @@ import Link from "./link";
 import { compact, date, duration, money } from "../lib/format";
 
 const gridSx = {
-  minWidth: 760,
   border: 0,
   "& .MuiDataGrid-toolbar": {
     borderBottom: "1px solid",
@@ -55,20 +54,18 @@ function TableGrid({
   rows,
   columns,
   initialState,
-  minWidth = 760,
   showToolbar = true,
 }: {
   label: string;
   rows: GridRowsProp;
   columns: GridColDef[];
   initialState?: GridInitialState;
-  minWidth?: number;
   showToolbar?: boolean;
 }) {
   return (
     <Paper
       variant="outlined"
-      sx={{ mt: 2, boxShadow: "8px 8px 0 #d5d5cb", overflowX: "auto" }}
+      sx={{ mt: 2, width: "100%", boxShadow: "8px 8px 0 #d5d5cb", overflow: "hidden" }}
     >
       <DataGrid
         aria-label={label}
@@ -90,7 +87,7 @@ function TableGrid({
             quickFilterProps: { debounceMs: 250 },
           },
         }}
-        sx={{ ...gridSx, minWidth }}
+        sx={{ ...gridSx, width: "100%" }}
       />
     </Paper>
   );
@@ -242,7 +239,6 @@ export function PromptsDataTable({
       initialState={{
         sorting: { sortModel: [{ field: promptSortFields[initialSort] ?? "context", sort: "desc" }] },
       }}
-      minWidth={1700}
       showToolbar={false}
     />
   );
