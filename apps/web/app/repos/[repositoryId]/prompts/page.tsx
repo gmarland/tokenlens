@@ -37,7 +37,7 @@ export default async function Prompts({ params, searchParams }: any) {
       <Eyebrow sx={{ mt: 3 }}>Prompt explorer</Eyebrow>
       <Typography variant="h1">Observed prompts</Typography>
       <Stack direction="row" spacing={2} sx={{ mt: 2 }}>
-        <BackLink href={`/repos/${id}/benchmarks`}>View benchmarks →</BackLink>
+        <BackLink href={`/repos/${id}${back.size ? `?${back}` : ""}#prompt-benchmarks`}>View benchmarks →</BackLink>
       </Stack>
       <Stack  
         component="form"

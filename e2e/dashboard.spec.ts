@@ -13,6 +13,8 @@ test("surfaces repository actions and diagnostic navigation", async ({ page }) =
   const repository = page.getByRole("grid", { name: "Repositories" }).getByRole("link", { name: "tokenlens", exact: true });
   await repository.click();
   await expect(page.getByRole("heading", { name: "Recommended actions" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Prompt benchmarks" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Benchmarks", exact: true })).toHaveAttribute("href", /#prompt-benchmarks$/);
   await expect(page.getByRole("link", { name: "Insights" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Hotspots" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Model comparisons" })).toBeVisible();

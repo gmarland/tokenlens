@@ -8,6 +8,7 @@ import { AnalysisFilters } from "../../../components/filters";
 import { InsightCards } from "../../../components/insight-cards";
 import { ContextComposition } from "../../../components/context-composition";
 import { RepositoryNav } from "../../../components/repository-nav";
+import { PromptBenchmarks } from "../../../components/prompt-benchmarks";
 import { RepositoryTimelines } from "../../../components/repository-timelines";
 import {
   BackLink,
@@ -24,7 +25,7 @@ import {
   Toolbar,
 } from "../../../components/ui";
 import { repository } from "../../../lib/data";
-import { repositoryInsightBundle } from "../../../lib/insights";
+import { repositoryBenchmarkSummaries, repositoryInsightBundle } from "../../../lib/insights";
 import { compact, duration } from "../../../lib/format";
 
 export const dynamic = "force-dynamic";
@@ -32,9 +33,10 @@ export const dynamic = "force-dynamic";
 export default async function Repo({ params, searchParams }: any) {
   const id = (await params).repositoryId;
   const q = await searchParams;
-  const [data, insightBundle] = await Promise.all([
+  const [data, insightBundle, benchmarks] = await Promise.all([
     repository(id, q.model, q.provider),
     repositoryInsightBundle(id, { model: q.model, provider: q.provider }),
+    repositoryBenchmarkSummaries(id),
   ]);
   if (!data) notFound();
   const rs = data.prompts;
@@ -66,9 +68,6 @@ export default async function Repo({ params, searchParams }: any) {
             Observed structure and coding-agent behaviour. Analysis scope:{" "}
             <Box component="strong">{scope}</Box>
           </Intro>
-          <Box sx={{ mt: 2 }}>
-            <BackLink href={`/repos/${id}/benchmarks`}>View prompt benchmarks →</BackLink>
-          </Box>
         </Box>
         <AnalysisFilters
           key={`${q.provider ?? ""}:${q.model ?? ""}`}
@@ -114,6 +113,13 @@ export default async function Repo({ params, searchParams }: any) {
           )}
         />
       </Cards>
+      <Box id="prompt-benchmarks" sx={{ scrollMarginTop: 16 }}>
+        <SectionTitle>Prompt benchmarks</SectionTitle>
+        <Typography color="text.secondary" sx={{ maxWidth: 760 }}>
+          Exact prompt and model matches are tracked across repository revisions. These charts measure usage and agent behaviour; assistant response contents are not collected.
+        </Typography>
+        <PromptBenchmarks benchmarks={benchmarks} />
+      </Box>
       <SectionTitle>Recommended actions</SectionTitle>
       <Panel><InsightCards insights={insightBundle.insights.filter((insight) => !["dismissed", "resolved"].includes(insight.state ?? "new")).slice(0, 3)} /></Panel>
       <SectionTitle>Context composition</SectionTitle>

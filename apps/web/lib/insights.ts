@@ -22,7 +22,8 @@ import {
   type AnalyticsFilter,
 } from "@tokenlens/database/analytics";
 import type { BenchmarkFact, Insight } from "@tokenlens/shared";
-import { benchmarkDetail } from "./data";
+import { benchmarkDetail, repositoryBenchmarks } from "./data";
+import type { PromptBenchmarkSummary } from "../components/prompt-benchmarks";
 
 const severity = { warning: 0, opportunity: 1, info: 2 } as const;
 const sorted = (insights: Insight[]) => [...insights].sort((a, b) =>
@@ -98,6 +99,25 @@ export async function benchmarkInsight(benchmarkId: string) {
   });
   const states = await repositoryInsightStates(detail.benchmark.repository_id);
   return { detail, insights: insight ? [{ ...insight, state: states[insight.id] ?? "new" as const }] : [] };
+}
+
+export async function repositoryBenchmarkSummaries(repositoryId: string): Promise<PromptBenchmarkSummary[]> {
+  const benchmarks = await repositoryBenchmarks(repositoryId);
+  const regressions = new Map(await Promise.all(benchmarks.map(async (benchmark: any) => {
+    const result = await benchmarkInsight(String(benchmark.id));
+    return [String(benchmark.id), Boolean(result?.insights.length)] as const;
+  })));
+
+  return benchmarks.map((benchmark: any) => ({
+    id: String(benchmark.id),
+    name: String(benchmark.name),
+    provider: String(benchmark.provider),
+    model: String(benchmark.model),
+    runs: Number(benchmark.runs ?? 0),
+    lastSeenAt: benchmark.last_seen_at ? new Date(benchmark.last_seen_at).toISOString() : null,
+    medianContext: benchmark.median_context == null ? null : Number(benchmark.median_context),
+    regression: regressions.get(String(benchmark.id)) ?? false,
+  }));
 }
 
 export async function promptInsight(promptId: string, repositoryId: string, provider: string, model: string | null) {
