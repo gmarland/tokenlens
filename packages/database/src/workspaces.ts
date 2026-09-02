@@ -11,6 +11,31 @@ export type WorkspaceAccess = {
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
+export type UserProfile = {
+  id: string;
+  name: string;
+  email: string;
+};
+
+export async function updateUserProfile(
+  userId: string,
+  input: { name: string; email: string },
+): Promise<UserProfile | null> {
+  const database = await db();
+  const name = input.name.trim();
+  const email = normalizeEmail(input.email);
+  const rows = await database.query(
+    `update users
+     set name=$2,
+         email=$3,
+         "emailVerified"=case when email is distinct from $3 then null else "emailVerified" end
+     where id=$1
+     returning id,name,email`,
+    [userId, name, email],
+  ) as UserProfile[];
+  return rows[0] ?? null;
+}
+
 export async function provisionUserWorkspace(userId: string, email: string, name?: string | null) {
   const database = await db();
   return database.transaction(async (manager) => {
@@ -98,7 +123,7 @@ export async function workspaceAccess(userId: string, requestedWorkspaceId?: str
   return rows[0] ?? null;
 }
 
-export async function listWorkspaceSettings(workspaceId: string) {
+export async function listWorkspaceApiKeyManagementData(workspaceId: string) {
   const database = await db();
   const [keys, agents] = await Promise.all([
     database.query(`select id,name,key_prefix,created_at,last_used_at,revoked_at from workspace_api_keys where workspace_id=$1 order by created_at desc`, [workspaceId]),

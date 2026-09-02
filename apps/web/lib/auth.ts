@@ -7,6 +7,7 @@ export async function currentWorkspace() {
   const session = await auth();
   const user = session?.user as ({
     id?: string;
+    name?: string | null;
     email?: string | null;
     workspaceId?: string;
     workspaceName?: string;
@@ -15,6 +16,7 @@ export async function currentWorkspace() {
   if (!user?.id || !user.workspaceId || !user.workspaceName || !user.workspaceRole) return null;
   return {
     userId: user.id,
+    name: user.name ?? "",
     email: user.email ?? "",
     workspaceId: user.workspaceId,
     workspaceName: user.workspaceName,

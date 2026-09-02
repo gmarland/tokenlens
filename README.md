@@ -46,7 +46,7 @@ enabled when `AUTH_GOOGLE_ID` and `AUTH_GOOGLE_SECRET` are configured. Each new
 account receives a workspace and owner membership; verified
 `gareth.marland@gmail.com` claims the existing unowned workspace. Owners can
 invite other users and create, rotate, or revoke write-only ingestion keys from
-the workspace settings page.
+the API Keys page.
 
 Set a long random `AUTH_SECRET` in every environment. Configure `EMAIL_SERVER`
 and `EMAIL_FROM` for production mail delivery. Local development uses Mailpit

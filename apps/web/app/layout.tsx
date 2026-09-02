@@ -7,6 +7,7 @@ import Typography from "@mui/material/Typography";
 import { ThemeProvider } from "@mui/material/styles";
 import { AppRouterCacheProvider } from "@mui/material-nextjs/v16-appRouter";
 import Link from "../components/link";
+import AccountMenu from "../components/account-menu";
 import theme from "./theme";
 import { auth, signOut } from "../auth";
 
@@ -103,14 +104,12 @@ export default async function Layout({ children }: { children: React.ReactNode }
                 </Box>
                 {session?.user ? (
                   <Box sx={{ justifySelf: "end", display: "flex", alignItems: "center", gap: 2 }}>
-                    <MuiLink component={Link} href="/settings" color="inherit" underline="hover" sx={{ fontSize: 13, fontWeight: 800 }}>
-                      Settings
-                    </MuiLink>
-                    <Box component="form" action={async () => { "use server"; await signOut({ redirectTo: "/login" }); }}>
-                      <Box component="button" type="submit" sx={{ border: 0, background: "none", cursor: "pointer", font: "inherit", fontSize: 13, fontWeight: 800, p: 0 }}>
-                        Sign out
-                      </Box>
-                    </Box>
+                    {workspaceRole === "owner" ? (
+                      <MuiLink component={Link} href="/api-keys" color="inherit" underline="hover" sx={{ fontSize: 13, fontWeight: 800 }}>
+                        API Keys
+                      </MuiLink>
+                    ) : null}
+                    <AccountMenu signOutAction={async () => { "use server"; await signOut({ redirectTo: "/login" }); }} />
                   </Box>
                 ) : <Box />}
               </Toolbar>
