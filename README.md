@@ -93,6 +93,10 @@ branch/commit/dirty state, commit author and committer identities and timestamps
 relative file paths, token totals, model and tool metadata, and repository/file
 structural metrics.
 
+Instruction-file contents remain local; snapshots include an aggregate SHA-256
+fingerprint so same-size AGENTS.md and CLAUDE.md changes can be detected without
+uploading their contents or individual file hashes.
+
 It does **not** receive assistant responses, source contents, tool output, search
 patterns, matched text, commit messages, raw terminal output, credentials from
 Git remotes, or absolute local paths. Source and dependency analysis happens
@@ -118,6 +122,22 @@ and tools also affect token usage. This MVP cannot control for them.
 Prompt benchmarks measure observed token usage, duration, cost availability,
 tool activity, and file-access behaviour. They do not score response correctness
 or quality because assistant response contents are not collected.
+
+The action centre applies versioned, deterministic rules to complete telemetry.
+Repository relationship insights require at least 20 prompts and file-based
+insights require at least 70% attribution coverage; matched benchmark regressions
+use five preceding complete runs. Each recommendation exposes its sample size,
+coverage, evidence, caveats, validation step, and a deterministic illustrative
+example with ordered actions. Examples may include observed file, tool, provider,
+or model names, but never source contents, tool output, absolute paths, prompt
+text, or developer identity. Evidence links retain the active analysis scope and
+focus the relevant file or tool where applicable. Users can acknowledge, monitor,
+dismiss, or resolve an insight without altering the underlying measurements.
+
+Hotspot, tool-health, and matched-model pages provide the supporting evidence.
+Matched model/provider results are candidates for a separate quality evaluation,
+not automatic routing advice. Onboarding insights require an aggregate cohort of
+at least five developers and never expose individual rankings.
 
 ## Commands and tests
 

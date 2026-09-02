@@ -12,6 +12,7 @@ import {
 } from "@mui/x-data-grid";
 import Link from "./link";
 import { compact, date, duration, money } from "../lib/format";
+import type { FileHotspot, MatchedModelComparison, ToolHealth } from "@tokenlens/shared";
 
 const gridSx = {
   border: 0,
@@ -54,12 +55,14 @@ function TableGrid({
   rows,
   columns,
   initialState,
+  initialQuickFilter,
   showToolbar = true,
 }: {
   label: string;
   rows: GridRowsProp;
   columns: GridColDef[];
   initialState?: GridInitialState;
+  initialQuickFilter?: string;
   showToolbar?: boolean;
 }) {
   return (
@@ -73,6 +76,7 @@ function TableGrid({
         columns={columns}
         initialState={{
           pagination: { paginationModel: { page: 0, pageSize: 25 } },
+          ...(initialQuickFilter ? { filter: { filterModel: { items: [], quickFilterValues: [initialQuickFilter] } } } : {}),
           ...initialState,
         }}
         pageSizeOptions={[10, 25, 50, 100]}
@@ -135,7 +139,7 @@ export function RepositoriesDataTable({
     { field: "medianFiles", headerName: "Files read", type: "number", minWidth: 120, valueFormatter: (value) => Number(value).toFixed(1) },
   ];
 
-  return <TableGrid label="Repositories" rows={rows} columns={columns} />;
+  return <TableGrid label="Repositories" rows={rows} columns={columns} showToolbar={false} />;
 }
 
 export type FileReadTableRow = {
@@ -242,4 +246,68 @@ export function PromptsDataTable({
       showToolbar={false}
     />
   );
+}
+
+export function HotspotsDataTable({ rows, initialFile }: { rows: FileHotspot[]; initialFile?: string }) {
+  const columns: GridColDef<FileHotspot>[] = [
+    { field: "path", headerName: "File", minWidth: 320, flex: 1 },
+    { field: "moduleName", headerName: "Module", minWidth: 170 },
+    { field: "prompts", headerName: "Prompts", type: "number", minWidth: 100 },
+    { field: "promptShare", headerName: "Coverage", type: "number", minWidth: 110, valueFormatter: (value) => `${(Number(value) * 100).toFixed(1)}%` },
+    { field: "repeatedReads", headerName: "Repeat reads", type: "number", minWidth: 125 },
+    { field: "medianContext", headerName: "Median context", type: "number", minWidth: 150, valueFormatter: compact },
+    { field: "contextLiftPercent", headerName: "Context lift", type: "number", minWidth: 125, valueFormatter: (value) => value == null ? "—" : `${Number(value) >= 0 ? "+" : ""}${Number(value).toFixed(1)}%` },
+    { field: "loc", headerName: "LOC", type: "number", minWidth: 90, valueFormatter: compact },
+    { field: "fanIn", headerName: "Fan-in", type: "number", minWidth: 90 },
+    { field: "fanOut", headerName: "Fan-out", type: "number", minWidth: 95 },
+    { field: "inCycle", headerName: "Cycle", type: "boolean", minWidth: 90 },
+  ];
+  return <TableGrid
+    label="Repository file hotspots"
+    rows={rows.map((row) => ({ ...row, id: row.path }))}
+    columns={columns}
+    initialQuickFilter={initialFile}
+    initialState={{ sorting: { sortModel: [{ field: "contextLiftPercent", sort: "desc" }] } }}
+  />;
+}
+
+export function ToolHealthDataTable({ rows, initialTool }: { rows: ToolHealth[]; initialTool?: string }) {
+  const columns: GridColDef<ToolHealth>[] = [
+    { field: "toolName", headerName: "Tool", minWidth: 220, flex: 1 },
+    { field: "category", headerName: "Category", minWidth: 110 },
+    { field: "calls", headerName: "Calls", type: "number", minWidth: 90 },
+    { field: "knownOutcomes", headerName: "Known outcomes", type: "number", minWidth: 145 },
+    { field: "failureRate", headerName: "Failure rate", type: "number", minWidth: 125, valueFormatter: (value) => value == null ? "—" : `${(Number(value) * 100).toFixed(1)}%` },
+    { field: "medianDurationMs", headerName: "Median duration", type: "number", minWidth: 150, valueFormatter: duration },
+    { field: "p95DurationMs", headerName: "p95 duration", type: "number", minWidth: 130, valueFormatter: duration },
+    { field: "medianResultBytes", headerName: "Median result", type: "number", minWidth: 135, valueFormatter: compact },
+    { field: "p95ResultBytes", headerName: "p95 result", type: "number", minWidth: 120, valueFormatter: compact },
+  ];
+  return <TableGrid
+    label="Repository tool health"
+    rows={rows.map((row) => ({ ...row, id: row.toolName }))}
+    columns={columns}
+    initialQuickFilter={initialTool}
+    initialState={{ sorting: { sortModel: [{ field: "calls", sort: "desc" }] } }}
+  />;
+}
+
+export function ModelComparisonsDataTable({ rows }: { rows: MatchedModelComparison[] }) {
+  const columns: GridColDef<MatchedModelComparison>[] = [
+    { field: "promptText", headerName: "Matched prompt", minWidth: 300, flex: 1, valueFormatter: (value) => String(value).replace(/\s+/g, " ").slice(0, 100) },
+    { field: "provider", headerName: "Provider", minWidth: 110 },
+    { field: "model", headerName: "Model", minWidth: 180 },
+    { field: "runs", headerName: "Runs", type: "number", minWidth: 85 },
+    { field: "medianContext", headerName: "Median context", type: "number", minWidth: 150, valueFormatter: compact },
+    { field: "medianDurationMs", headerName: "Median duration", type: "number", minWidth: 150, valueFormatter: duration },
+    { field: "medianCostUsd", headerName: "Median cost", type: "number", minWidth: 120, valueFormatter: money },
+    { field: "medianFilesRead", headerName: "Median files", type: "number", minWidth: 120, valueFormatter: (value) => value == null ? "—" : Number(value).toFixed(1) },
+    { field: "failureRate", headerName: "Tool failures", type: "number", minWidth: 125, valueFormatter: (value) => value == null ? "—" : `${(Number(value) * 100).toFixed(1)}%` },
+  ];
+  return <TableGrid
+    label="Matched model and provider comparisons"
+    rows={rows.map((row) => ({ ...row, id: `${row.promptFingerprint}:${row.provider}:${row.model}` }))}
+    columns={columns}
+    initialState={{ sorting: { sortModel: [{ field: "promptText", sort: "asc" }] } }}
+  />;
 }

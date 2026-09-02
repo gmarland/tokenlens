@@ -80,6 +80,7 @@ export class RepoSnapshot {
   @Column("bigint", { name: "claude_md_total_bytes", transformer: bigintNumber }) claudeMdTotalBytes!: number;
   @Column("integer", { name: "agents_md_count", default: 0 }) agentsMdCount!: number;
   @Column("bigint", { name: "agents_md_total_bytes", default: 0, transformer: bigintNumber }) agentsMdTotalBytes!: number;
+  @Column("text", { name: "instruction_fingerprint", nullable: true }) instructionFingerprint!: string | null;
   @Column("integer", { name: "generated_file_count" }) generatedFileCount!: number;
   @Column("bigint", { name: "generated_file_bytes", transformer: bigintNumber }) generatedFileBytes!: number;
   @Column("integer", { name: "dependency_graph_nodes" }) dependencyGraphNodes!: number;
@@ -233,4 +234,16 @@ export class ToolFileAccess {
   @Column("text") attribution!: string;
 }
 
-export const entities = [Workspace, Developer, Repository, RepoSnapshot, RepoSnapshotFile, RepoCommit, Prompt, PromptBenchmark, ApiRequest, ToolEvent, ToolFileAccess];
+@Entity("insight_states")
+@Index("insight_state_repository_insight_uq", ["repositoryId", "insightId"], { unique: true })
+export class InsightStateRecord {
+  @PrimaryGeneratedColumn("uuid") id!: string;
+  @Column("uuid", { name: "workspace_id" }) workspaceId!: string;
+  @Column("uuid", { name: "repository_id" }) repositoryId!: string;
+  @Column("text", { name: "insight_id" }) insightId!: string;
+  @Column("text", { default: "new" }) state!: string;
+  @CreateDateColumn({ name: "created_at", type: "timestamptz" }) createdAt!: Date;
+  @Column("timestamptz", { name: "updated_at", default: () => "now()" }) updatedAt!: Date;
+}
+
+export const entities = [Workspace, Developer, Repository, RepoSnapshot, RepoSnapshotFile, RepoCommit, Prompt, PromptBenchmark, ApiRequest, ToolEvent, ToolFileAccess, InsightStateRecord];

@@ -6,9 +6,11 @@ import Typography from "@mui/material/Typography";
 import { median } from "@tokenlens/analytics";
 import { notFound } from "next/navigation";
 import { FileReadsDataTable } from "../../../components/data-tables";
+import { InsightCards } from "../../../components/insight-cards";
 import { CreateBenchmarkButton } from "../../../components/create-benchmark-button";
 import { BackLink, Cards, EmptyState, Eyebrow, Intro, MetricCard, Page, Panel, SectionTitle } from "../../../components/ui";
 import { promptDetail } from "../../../lib/data";
+import { promptInsight } from "../../../lib/insights";
 import { compact, money, duration, date } from "../../../lib/format";
 import { canonicalToolActions } from "../../../lib/tool-events";
 
@@ -50,6 +52,9 @@ export default async function Prompt({ params }: any) {
   ].sort((a, b) => +new Date(a.timestamp) - +new Date(b.timestamp));
   const costs = api.map((x: any) => x.cost_usd).filter((x: any) => x != null);
   const promptModels = [...new Set(api.map((x: any) => x.model ?? p.model).filter(Boolean))] as string[];
+  const comparisons = p.repository_id
+    ? await promptInsight(p.id, p.repository_id, p.provider, promptModels.length === 1 ? promptModels[0] : p.model)
+    : [];
   const cards = (items: [string, string][]) => <Cards>{items.map(([label, value]) => <MetricCard key={label} label={label} value={value} />)}</Cards>;
 
   return <Page>
@@ -57,7 +62,7 @@ export default async function Prompt({ params }: any) {
     <Eyebrow sx={{ mt: 3 }}>{p.repository_name} · {date(p.started_at)} · {p.provider}</Eyebrow>
     <Typography variant="h1">{p.prompt_text ? p.prompt_text.slice(0, 100) : `Prompt #${p.external_prompt_id.slice(0, 10)}`}</Typography>
     <Intro>{p.email ?? "Identity pending"} · Prompt length {compact(p.prompt_length)} characters · No tool contents are stored.</Intro>
-    {p.repository_id && p.prompt_text && promptModels.length === 1
+    <Box id="create-benchmark" sx={{ scrollMarginTop: 16 }}>{p.repository_id && p.prompt_text && promptModels.length === 1
       ? <CreateBenchmarkButton repositoryId={p.repository_id} promptId={p.id} model={promptModels[0]} />
       : <Typography color="text.secondary" sx={{ mt: 2 }} variant="body2">
           {!p.prompt_text
@@ -65,7 +70,8 @@ export default async function Prompt({ params }: any) {
             : promptModels.length > 1
               ? "This prompt used multiple models, so its aggregate measurements cannot form a single-model benchmark."
               : "Benchmarking will be available when model telemetry arrives."}
-        </Typography>}
+        </Typography>}</Box>
+    {comparisons.length ? <><SectionTitle>Compared with repository baseline</SectionTitle><Panel><InsightCards insights={comparisons} /></Panel></> : null}
     <SectionTitle>Usage</SectionTitle>{cards([
       ["Fresh input", cacheMetricsAvailable ? compact(fresh) : "—"], ["Cache read", cacheMetricsAvailable ? compact(cacheRead) : "—"], ["Cache creation", cacheMetricsAvailable ? compact(cacheCreate) : "—"], ["Output", compact(output)],
       ["Context processed", compact(context)], ["Cost", money(costs.length ? costs.reduce((n: number, x: any) => n + Number(x), 0) : null)], ["Model responses", String(api.length)],
@@ -83,7 +89,7 @@ export default async function Prompt({ params }: any) {
       ["Modules visited", hasReadAttribution ? String(modules.size) : "—"],
       ["Time to first edit", duration(firstEdit)],
     ])}
-    <SectionTitle>Working set</SectionTitle>{files.length ? cards([
+    <Box id="working-set" sx={{ scrollMarginTop: 16 }}><SectionTitle>Working set</SectionTitle>{files.length ? cards([
       ["Working-set LOC", compact(locs.reduce((a, b) => a + b, 0))], ["Mean file LOC", compact(locs.length ? locs.reduce((a, b) => a + b, 0) / locs.length : 0)],
       ["Median file LOC", compact(median(locs))], ["Largest file", compact(Math.max(0, ...locs))],
       ["Mean fan-out", (files.length ? files.reduce((n, x) => n + Number(x.dependency_fan_out ?? 0), 0) / files.length : 0).toFixed(1)],
@@ -96,7 +102,7 @@ export default async function Prompt({ params }: any) {
       reads: Number(f.reads ?? 0),
       fanOut: f.dependency_fan_out == null ? null : Number(f.dependency_fan_out),
       module: String(f.module_name ?? "Unmatched snapshot"),
-    }))} /> : <Panel sx={{ p: 0 }}><EmptyState>No file reads were attributed to this prompt.</EmptyState></Panel>}
+    }))} /> : <Panel sx={{ p: 0 }}><EmptyState>No file reads were attributed to this prompt.</EmptyState></Panel>}</Box>
     <SectionTitle>Timeline</SectionTitle><Panel sx={{ p: 0 }}><List disablePadding>{timeline.map((e, i) => <ListItem key={i} sx={{ alignItems: "flex-start", borderLeft: 2, borderColor: "divider", ml: 2, pl: 3, py: 1.5 }}>
       <Box sx={{ position: "absolute", width: 10, height: 10, bgcolor: "primary.main", borderRadius: "50%", left: -6, top: 20 }} />
       <ListItemText primary={e.kind} secondary={date(e.timestamp)} slotProps={{ primary: { sx: { fontWeight: 700 } }, secondary: { sx: { fontSize: 12 } } }} />

@@ -15,6 +15,13 @@ export type RepositoryStructureSnapshot = {
   totalSourceLoc: number;
   sourceFiles: number;
   modules: number;
+  filesOver500Loc?: number;
+  filesOver1000Loc?: number;
+  dependencyCycleCount?: number;
+  crossModuleEdgeRatio?: number;
+  p95FanOut?: number;
+  testToSourceRatio?: number;
+  instructionBytes?: number;
 };
 
 export type RepositoryCommit = {

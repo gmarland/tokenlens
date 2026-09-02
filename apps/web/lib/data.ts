@@ -67,6 +67,8 @@ export async function repository(id: string, model?: string, provider?: string) 
 
   const snapshotParameters = new Parameters();
   const snapshots = (await rows(`select s.id,s.captured_at,s.branch,s.head_sha,s.dirty,s.total_source_loc,s.source_files,
+      s.files_over_500_loc,s.files_over_1000_loc,s.dependency_cycle_count,s.cross_module_edge_ratio,s.p95_fan_out,
+      s.test_to_source_ratio,(s.claude_md_total_bytes+s.agents_md_total_bytes)::bigint instruction_bytes,
       count(distinct nullif(f.module_name,''))::int modules
     from repo_snapshots s left join repo_snapshot_files f on f.snapshot_id=s.id
     where s.repository_id=${snapshotParameters.add(id)}::uuid
@@ -80,6 +82,13 @@ export async function repository(id: string, model?: string, provider?: string) 
       totalSourceLoc: Number(snapshot.total_source_loc ?? 0),
       sourceFiles: Number(snapshot.source_files ?? 0),
       modules: Number(snapshot.modules ?? 0),
+      filesOver500Loc: Number(snapshot.files_over_500_loc ?? 0),
+      filesOver1000Loc: Number(snapshot.files_over_1000_loc ?? 0),
+      dependencyCycleCount: Number(snapshot.dependency_cycle_count ?? 0),
+      crossModuleEdgeRatio: Number(snapshot.cross_module_edge_ratio ?? 0),
+      p95FanOut: Number(snapshot.p95_fan_out ?? 0),
+      testToSourceRatio: Number(snapshot.test_to_source_ratio ?? 0),
+      instructionBytes: Number(snapshot.instruction_bytes ?? 0),
     }));
 
   const commitParameters = new Parameters();
@@ -119,7 +128,12 @@ export async function repository(id: string, model?: string, provider?: string) 
       count(*)filter(where a.kind='read')-count(distinct a.relative_file_path)filter(where a.kind='read')repeated_reads,
       (select sum(tool_result_size_bytes) from tool_events where prompt_id=p.id)tool_bytes,
       count(distinct f.module_name)filter(where a.kind='read')modules,
-      sum(distinct f.loc)filter(where a.kind='read')working_loc,max(f.loc)filter(where a.kind='read')max_file_loc,
+      (select sum(ff.loc) from(
+        select distinct a2.relative_file_path,f2.loc from tool_events te2
+        join tool_file_accesses a2 on a2.tool_event_id=te2.id
+        join repo_snapshot_files f2 on f2.snapshot_id=p.snapshot_id and f2.path=a2.relative_file_path
+        where te2.prompt_id=p.id and a2.kind='read'
+      )ff)working_loc,max(f.loc)filter(where a.kind='read')max_file_loc,
       avg(f.dependency_fan_out)filter(where a.kind='read')mean_fan_out,
       min(te.timestamp)filter(where a.kind='edit' or lower(te.tool_name) in('edit','write','notebookedit','apply_patch'))first_edit
       from tool_events te left join tool_file_accesses a on a.tool_event_id=te.id
@@ -285,7 +299,9 @@ export async function benchmarkDetail(id: string) {
 
   const pointParameters = new Parameters();
   const points = (await rows(`select p.id,p.started_at,p.branch,p.head_sha,p.dirty,
-      coalesce(u.context_tokens,0)::bigint context_tokens,coalesce(u.output_tokens,0)::bigint output_tokens,
+      coalesce(u.context_tokens,0)::bigint context_tokens,coalesce(u.fresh_input_tokens,0)::bigint fresh_input_tokens,
+      coalesce(u.cache_read_tokens,0)::bigint cache_read_tokens,coalesce(u.cache_creation_tokens,0)::bigint cache_creation_tokens,
+      coalesce(u.output_tokens,0)::bigint output_tokens,
       u.cost_usd,coalesce(u.duration_ms,0)::bigint response_duration_ms,coalesce(u.api_calls,0)::int api_calls,
       coalesce(t.tool_calls,0)::int tool_calls,coalesce(t.failed_tools,0)::int failed_tools,
       coalesce(t.files_read,0)::int files_read,coalesce(t.files_edited,0)::int files_edited,
@@ -294,6 +310,8 @@ export async function benchmarkDetail(id: string) {
     from prompts p
     left join lateral(
       select sum(input_tokens+cache_read_tokens+cache_creation_tokens)::bigint context_tokens,
+        sum(input_tokens)::bigint fresh_input_tokens,sum(cache_read_tokens)::bigint cache_read_tokens,
+        sum(cache_creation_tokens)::bigint cache_creation_tokens,
         sum(output_tokens)::bigint output_tokens,sum(cost_usd)::numeric cost_usd,
         sum(duration_ms)::bigint duration_ms,count(*)::int api_calls,max(timestamp) last_api_at,
         max(coalesce(model,p.model)) model,count(distinct coalesce(model,p.model))::int model_count
@@ -323,6 +341,9 @@ export async function benchmarkDetail(id: string) {
       headSha: point.head_sha == null ? null : String(point.head_sha),
       dirty: point.dirty == null ? null : Boolean(point.dirty),
       contextTokens: Number(point.context_tokens ?? 0),
+      freshInputTokens: Number(point.fresh_input_tokens ?? 0),
+      cacheReadTokens: Number(point.cache_read_tokens ?? 0),
+      cacheCreationTokens: Number(point.cache_creation_tokens ?? 0),
       outputTokens: Number(point.output_tokens ?? 0),
       costUsd: point.cost_usd == null ? null : Number(point.cost_usd),
       responseDurationMs: Number(point.response_duration_ms ?? 0),

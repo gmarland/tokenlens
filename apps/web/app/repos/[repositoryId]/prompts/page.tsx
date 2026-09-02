@@ -4,6 +4,7 @@ import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import { PromptsDataTable } from "../../../../components/data-tables";
 import Link from "../../../../components/link";
+import { RepositoryNav } from "../../../../components/repository-nav";
 import {
   BackLink,
   EmptyState,
@@ -37,8 +38,9 @@ export default async function Prompts({ params, searchParams }: any) {
       <Eyebrow sx={{ mt: 3 }}>Prompt explorer</Eyebrow>
       <Typography variant="h1">Observed prompts</Typography>
       <Stack direction="row" spacing={2} sx={{ mt: 2 }}>
-        <BackLink href={`/repos/${id}/benchmarks`}>View benchmarks →</BackLink>
+        <BackLink href={`/repos/${id}/benchmarks${back.size ? `?${back}` : ""}`}>View benchmarks →</BackLink>
       </Stack>
+      <RepositoryNav repositoryId={id} queryString={back.toString()} />
       <Stack  
         component="form"
         method="get"

@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+export * from "./insights";
+
 export const providerSchema = z.enum(["claude", "codex"]);
 export type Provider = z.infer<typeof providerSchema>;
 
