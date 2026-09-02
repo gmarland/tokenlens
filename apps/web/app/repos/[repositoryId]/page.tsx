@@ -15,7 +15,6 @@ import {
   Page,
   Panel,
   SectionTitle,
-  Toolbar,
 } from "../../../components/ui";
 import { repository } from "../../../lib/data";
 import { repositoryInsightBundle } from "../../../lib/insights";
@@ -28,30 +27,35 @@ export default async function Repo({ params, searchParams }: any) {
   const q = await searchParams;
   const [data, insightBundle] = await Promise.all([
     repository(id, q.model, q.provider),
-    repositoryInsightBundle(id, { model: q.model, provider: q.provider }),
+    repositoryInsightBundle(id),
   ]);
   if (!data) notFound();
   const rs = data.prompts;
   const s = data.repo.snapshot ?? {};
   const latestStructure = data.snapshots.at(-1);
-  const scope = `${q.provider ?? "all providers"} · ${q.model ?? "all models"}`;
   const nums = (k: string) => rs.map((x: any) => Number(x[k] ?? 0));
-  const promptQuery = new URLSearchParams();
-  if (q.model) promptQuery.set("model", q.model);
-  if (q.provider) promptQuery.set("provider", q.provider);
 
   return (
     <Page>
       <BackLink href="/">← All repositories</BackLink>
-      <Toolbar>
-        <Box sx={{ mt: 3 }}>
-          <Eyebrow>Repository</Eyebrow>
-          <Typography variant="h1">{data.repo.name}</Typography>
-          <Intro>
-            Observed structure and coding-agent behaviour. Analysis scope:{" "}
-            <Box component="strong">{scope}</Box>
-          </Intro>
-        </Box>
+      <Box sx={{ mt: 3 }}>
+        <Eyebrow>Repository</Eyebrow>
+        <Typography variant="h1">{data.repo.name}</Typography>
+        <Intro>Observed structure and coding-agent behaviour.</Intro>
+      </Box>
+      <RepositoryNav repositoryId={id} />
+      <Box
+        sx={{
+          mt: 5,
+          mb: 3,
+          display: "flex",
+          flexDirection: { xs: "column", md: "row" },
+          gap: 2,
+          alignItems: { xs: "flex-start", md: "flex-end" },
+          justifyContent: "space-between",
+        }}
+      >
+        <Typography variant="h2">Overview</Typography>
         <AnalysisFilters
           key={`${q.provider ?? ""}:${q.model ?? ""}`}
           idPrefix="repository"
@@ -67,8 +71,7 @@ export default async function Repo({ params, searchParams }: any) {
           }))}
           modelLabel="Model"
         />
-      </Toolbar>
-      <RepositoryNav repositoryId={id} queryString={promptQuery.toString()} />
+      </Box>
       <Cards>
         <MetricCard label="Source LOC" value={compact(s.total_source_loc)} />
         <MetricCard label="Source files" value={compact(s.source_files)} />
