@@ -11,6 +11,7 @@ import {
   Page,
   Panel,
   SectionTitle,
+  Toolbar,
 } from "../../../../components/ui";
 import { repository } from "../../../../lib/data";
 import { repositoryInsightBundle } from "../../../../lib/insights";
@@ -36,13 +37,16 @@ export default async function Hotspots({
   );
   return (
     <Page>
-      <BackLink href="/">← All repositories</BackLink>
-      <Eyebrow sx={{ mt: 3 }}>Repository diagnostics</Eyebrow>
-      <Typography variant="h1">File hotspots · {repo.repo.name}</Typography>
-      <Intro>
-        Files are ranked by observed traversal and context association. These
-        relationships do not establish causation.
-      </Intro>
+      <Toolbar>
+        <Box>
+          <Eyebrow>Observed agent hotspots</Eyebrow>
+          <Typography variant="h1">{repo.repo.name}</Typography>
+          <Intro>
+            Files are ranked by observed traversal and context association.
+            These relationships do not establish causation.
+          </Intro>
+        </Box>
+      </Toolbar>
       <RepositoryNav repositoryId={repositoryId} />
       <SectionTitle>Recommended actions</SectionTitle>
       <Panel>

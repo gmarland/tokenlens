@@ -6,14 +6,16 @@ import { PromptsDataTable } from "../../../../components/data-tables";
 import Link from "../../../../components/link";
 import { RepositoryNav } from "../../../../components/repository-nav";
 import {
-  BackLink,
   EmptyState,
   Eyebrow,
   Intro,
   Page,
   Panel,
+  Toolbar,
 } from "../../../../components/ui";
-import { repositoryPrompts } from "../../../../lib/data";
+import { repository, repositoryPrompts } from "../../../../lib/data";
+import Box from "@mui/material/Box";
+import { notFound } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +23,9 @@ export default async function Prompts({ params, searchParams }: any) {
   const id = (await params).repositoryId;
   const q = await searchParams;
   const search = typeof q.search === "string" ? q.search.trim() : "";
+  const model = typeof q.model === "string" ? q.model : undefined;
+  const data = await repository(id, model, q.provider);
+  if (!data) notFound();
   const rows = await repositoryPrompts(id, q.sort, q.model, q.provider, search);
   const back = new URLSearchParams();
   if (q.model) back.set("model", q.model);
@@ -32,16 +37,17 @@ export default async function Prompts({ params, searchParams }: any) {
 
   return (
     <Page>
-      <BackLink href={`/repos/${id}${back.size ? `?${back}` : ""}`}>
-        ← Repository
-      </BackLink>
-      <Eyebrow sx={{ mt: 3 }}>Prompt explorer</Eyebrow>
-      <Typography variant="h1">Observed prompts</Typography>
-      <Stack direction="row" spacing={2} sx={{ mt: 2 }}>
-        <BackLink href={`/repos/${id}/benchmarks${back.size ? `?${back}` : ""}`}>View benchmarks →</BackLink>
-      </Stack>
+      <Toolbar>
+        <Box>
+          <Eyebrow>Prompt explorer</Eyebrow>
+          <Typography variant="h1">{data.repo.name}</Typography>
+          <Intro>
+            Prompts observed in the repository, with context and traversal
+          </Intro>
+        </Box>
+      </Toolbar>
       <RepositoryNav repositoryId={id} queryString={back.toString()} />
-      <Stack  
+      <Stack
         component="form"
         method="get"
         direction={{ xs: "column", sm: "row" }}

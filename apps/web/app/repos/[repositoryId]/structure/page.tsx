@@ -26,11 +26,10 @@ export default async function Structure({
 
   return (
     <Page>
-      <BackLink href="/">← All repositories</BackLink>
       <Toolbar>
-        <Box sx={{ mt: 3 }}>
+        <Box>
           <Eyebrow>Repository architecture</Eyebrow>
-          <Typography variant="h1">Structure · {data.repo.name}</Typography>
+          <Typography variant="h1">{data.repo.name}</Typography>
           <Intro>
             Current repository shape and structural change over time.
           </Intro>

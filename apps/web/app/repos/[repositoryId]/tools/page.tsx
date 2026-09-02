@@ -11,6 +11,7 @@ import {
   Page,
   Panel,
   SectionTitle,
+  Toolbar,
 } from "../../../../components/ui";
 import { repository } from "../../../../lib/data";
 import { repositoryInsightBundle } from "../../../../lib/insights";
@@ -36,13 +37,16 @@ export default async function Tools({
   );
   return (
     <Page>
-      <BackLink href="/">← All repositories</BackLink>
-      <Eyebrow sx={{ mt: 3 }}>Repository diagnostics</Eyebrow>
-      <Typography variant="h1">Tool health · {repo.repo.name}</Typography>
-      <Intro>
-        Failure rates include only calls whose outcome telemetry is known.
-        Missing durations and result sizes remain unavailable.
-      </Intro>
+      <Toolbar>
+        <Box>
+          <Eyebrow>Observed agent tools</Eyebrow>
+          <Typography variant="h1">{repo.repo.name}</Typography>
+          <Intro>
+            Failure rates include only calls whose outcome telemetry is known.
+            Missing durations and result sizes remain unavailable.
+          </Intro>
+        </Box>
+      </Toolbar>
       <RepositoryNav repositoryId={repositoryId} />
       <SectionTitle>Recommended actions</SectionTitle>
       <Panel>

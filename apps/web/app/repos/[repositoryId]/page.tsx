@@ -7,7 +7,6 @@ import { InsightCards } from "../../../components/insight-cards";
 import { ContextComposition } from "../../../components/context-composition";
 import { RepositoryNav } from "../../../components/repository-nav";
 import {
-  BackLink,
   Cards,
   Eyebrow,
   Intro,
@@ -37,8 +36,7 @@ export default async function Repo({ params, searchParams }: any) {
 
   return (
     <Page>
-      <BackLink href="/">← All repositories</BackLink>
-      <Box sx={{ mt: 3 }}>
+      <Box>
         <Eyebrow>Repository</Eyebrow>
         <Typography variant="h1">{data.repo.name}</Typography>
         <Intro>Observed structure and coding-agent behaviour.</Intro>

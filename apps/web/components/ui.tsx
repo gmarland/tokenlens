@@ -178,6 +178,7 @@ export function Eyebrow({
         display: "flex",
         alignItems: "center",
         gap: 1.25,
+        mb: 1,
         ...sx,
         "&::before": {
           content: '""',
