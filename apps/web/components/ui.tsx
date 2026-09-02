@@ -54,7 +54,6 @@ export function Cards({
         display: "grid",
         gridTemplateColumns: `repeat(auto-fit, minmax(${compact ? 230 : 175}px, 1fr))`,
         gap: 0,
-        my: { xs: 4, md: 6 },
       }}
     >
       {children}
@@ -155,7 +154,6 @@ export function Panel({
       variant="outlined"
       sx={{
         p: { xs: 2, sm: 3.5 },
-        mt: 2,
         boxShadow: "-8px 8px 0 #d5d5cb",
         ...sx,
       }}
@@ -214,7 +212,7 @@ export function Intro({ children }: { children: ReactNode }) {
 
 export function SectionTitle({ children }: { children: ReactNode }) {
   return (
-    <Typography variant="h2" sx={{ mt: 6, mb: 3 }}>
+    <Typography variant="h2" sx={{ mt: 5, mb: 3 }}>
       {children}
     </Typography>
   );
