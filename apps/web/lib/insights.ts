@@ -24,6 +24,7 @@ import {
 import type { BenchmarkFact, Insight } from "@tokenlens/shared";
 import { benchmarkDetail, repositoryBenchmarks } from "./data";
 import type { PromptBenchmarkSummary } from "../components/prompt-benchmarks";
+import { requireRepository } from "./auth";
 
 const severity = { warning: 0, opportunity: 1, info: 2 } as const;
 const confidence = { high: 0, medium: 1, low: 2 } as const;
@@ -44,6 +45,7 @@ export function scopedInsightFilter(input: { provider?: string; model?: string; 
 }
 
 export async function repositoryInsightBundle(repositoryId: string, filter: AnalyticsFilter = {}) {
+  if (!await requireRepository(repositoryId)) return { insights: [], facts: [], hotspots: [], tools: [], snapshots: [], comparisons: [] };
   const facts = await repositoryPromptFacts(repositoryId, filter);
   const [hotspots, tools, snapshots, states, benchmarkDetails] = await Promise.all([
     repositoryFileHotspots(repositoryId, facts),
@@ -131,6 +133,7 @@ export async function benchmarkInsight(benchmarkId: string) {
 }
 
 export async function repositoryBenchmarkSummaries(repositoryId: string): Promise<PromptBenchmarkSummary[]> {
+  if (!await requireRepository(repositoryId)) return [];
   const benchmarks = await repositoryBenchmarks(repositoryId);
   const regressions = new Map(await Promise.all(benchmarks.map(async (benchmark: any) => {
     const result = await benchmarkInsight(String(benchmark.id));
@@ -150,6 +153,7 @@ export async function repositoryBenchmarkSummaries(repositoryId: string): Promis
 }
 
 export async function promptInsight(promptId: string, repositoryId: string, provider: string, model: string | null) {
+  if (!await requireRepository(repositoryId)) return [];
   const facts = await repositoryPromptFacts(repositoryId, { provider, model: model ?? undefined });
   const prompt = facts.find((fact) => fact.id === promptId);
   if (!prompt) return [];

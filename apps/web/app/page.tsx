@@ -79,20 +79,16 @@ export default async function Home({
 
   return (
     <Page>
-      <Toolbar>
-        <Box>
-          <Eyebrow>Codebase efficiency profiler</Eyebrow>
-          <Typography variant="h1" sx={{ mt: 0.75 }}>
-            Repository context, made visible.
-          </Typography>
-          <Intro>
-            Measure how coding agents explore your repositories and discover
-            descriptive relationships between code structure and context
-            consumption.
-          </Intro>
-        </Box>
-      </Toolbar>
-
+      <Box sx={{ mb: 6 }}>
+        <Toolbar>
+          <Box>
+            <Eyebrow>Codebase efficiency profiler</Eyebrow>
+            <Typography variant="h1" sx={{ mt: 0.75 }}>
+              Repository context, made visible.
+            </Typography>
+          </Box>
+        </Toolbar>
+      </Box>
       <Cards>
         <MetricCard label="Repositories" value={compact(s.repositories)} />
         <MetricCard label="Developers" value={compact(s.developers)} />

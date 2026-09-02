@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { setState } = vi.hoisted(() => ({ setState: vi.fn() }));
 vi.mock("@tokenlens/database/analytics", () => ({ setRepositoryInsightState: setState }));
+vi.mock("../../../lib/auth", () => ({ requireRepository: vi.fn(async () => ({ workspaceId: "workspace-1" })) }));
 
 import { POST } from "./route";
 

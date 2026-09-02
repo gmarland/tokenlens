@@ -7,6 +7,7 @@ const dataMocks = vi.hoisted(() => ({
 }));
 
 vi.mock("./data", () => dataMocks);
+vi.mock("./auth", () => ({ requireRepository: vi.fn(async () => ({ workspaceId: "workspace-1" })) }));
 vi.mock("@tokenlens/database/analytics", () => ({
   matchedModelComparisons: () => [],
   repositoryFileHotspots: async () => [],

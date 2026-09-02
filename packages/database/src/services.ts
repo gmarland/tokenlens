@@ -1,6 +1,7 @@
 import type { ObjectLiteral, Repository as TypeOrmRepository } from "typeorm";
 import {
   ApiRequest,
+  AgentInstallation,
   Developer,
   Prompt,
   RepoSnapshot,
@@ -28,22 +29,23 @@ async function upsertAndFind<T extends ObjectLiteral>(
   return repository.findOneByOrFail(where as any);
 }
 
-async function stub(workspaceId: string, provider: Provider, externalPromptId: string, sessionId?: string) {
+async function stub(workspaceId: string, provider: Provider, externalPromptId: string, sessionId?: string, agentInstallationId?: string) {
   const source = await db();
   const prompts = source.getRepository(Prompt);
   const existing = await prompts.findOneBy({ workspaceId, provider, externalPromptId });
   if (existing) {
-    if (!existing.sessionId && sessionId) {
-      existing.sessionId = sessionId;
+    if ((!existing.sessionId && sessionId) || (!existing.agentInstallationId && agentInstallationId)) {
+      if (!existing.sessionId && sessionId) existing.sessionId = sessionId;
+      if (!existing.agentInstallationId && agentInstallationId) existing.agentInstallationId = agentInstallationId;
       return prompts.save(existing);
     }
     return existing;
   }
-  return upsertAndFind(prompts, { workspaceId, provider, externalPromptId, sessionId },
+  return upsertAndFind(prompts, { workspaceId, provider, externalPromptId, sessionId, agentInstallationId },
     ["workspaceId", "provider", "externalPromptId"], { workspaceId, provider, externalPromptId });
 }
 
-export async function promptForEvent(workspaceId: string, event: NormalizedAgentEvent) {
+export async function promptForEvent(workspaceId: string, event: NormalizedAgentEvent, agentInstallationId?: string) {
   const prompts = (await db()).getRepository(Prompt);
   if (event.provider === "codex" && event.sessionId) {
     const recent = await prompts.createQueryBuilder("prompt")
@@ -59,7 +61,7 @@ export async function promptForEvent(workspaceId: string, event: NormalizedAgent
 
   const exact = await prompts.findOneBy({ workspaceId, provider: event.provider, externalPromptId: event.promptId });
   if (exact) return exact;
-  return stub(workspaceId, event.provider, event.promptId, event.sessionId);
+  return stub(workspaceId, event.provider, event.promptId, event.sessionId, agentInstallationId);
 }
 
 export async function reconcileCodexSessionPrompt(prompt: Prompt) {
@@ -141,7 +143,7 @@ export async function reconcileCodexSessionPrompt(prompt: Prompt) {
   });
 }
 
-export async function ingestPrompt(workspaceId: string, input: PromptHook) {
+export async function ingestPrompt(workspaceId: string, input: PromptHook, agentInstallationId?: string) {
   const source = await db();
   const repositories = source.getRepository(Repository);
   const snapshots = source.getRepository(RepoSnapshot);
@@ -166,6 +168,7 @@ export async function ingestPrompt(workspaceId: string, input: PromptHook) {
 
   const prompt = await upsertAndFind(source.getRepository(Prompt), {
     workspaceId,
+    agentInstallationId,
     provider: input.provider,
     externalPromptId: input.promptId,
     sessionId: input.sessionId,
@@ -189,11 +192,12 @@ export async function ingestPrompt(workspaceId: string, input: PromptHook) {
   return prompt;
 }
 
-export async function ingestTool(workspaceId: string, input: ToolHook) {
+export async function ingestTool(workspaceId: string, input: ToolHook, agentInstallationId?: string) {
   const source = await db();
-  const prompt = await stub(workspaceId, input.provider, input.promptId, input.sessionId);
+  const prompt = await stub(workspaceId, input.provider, input.promptId, input.sessionId, agentInstallationId);
   const event = await upsertAndFind(source.getRepository(ToolEvent), {
     workspaceId,
+    agentInstallationId,
     promptId: prompt.id,
     toolUseId: input.toolUseId,
     ingestSource: "hook",
@@ -225,7 +229,7 @@ export async function ingestTool(workspaceId: string, input: ToolHook) {
   return event;
 }
 
-export async function ingestOtel(workspaceId: string, events: NormalizedAgentEvent[]) {
+export async function ingestOtel(workspaceId: string, events: NormalizedAgentEvent[], agentInstallationId?: string) {
   const source = await db();
   const developers = source.getRepository(Developer);
   const prompts = source.getRepository(Prompt);
@@ -233,7 +237,11 @@ export async function ingestOtel(workspaceId: string, events: NormalizedAgentEve
   const toolEvents = source.getRepository(ToolEvent);
 
   for (const event of events) {
-    const prompt = await promptForEvent(workspaceId, event);
+    const prompt = await promptForEvent(workspaceId, event, agentInstallationId);
+    if (agentInstallationId && !prompt.agentInstallationId) {
+      prompt.agentInstallationId = agentInstallationId;
+      await prompts.save(prompt);
+    }
     const identity = event.user?.externalId ?? event.user?.accountUuid ?? event.user?.accountId ??
       event.user?.anonymousId ?? event.user?.email;
     if (identity) {
@@ -289,6 +297,7 @@ export async function ingestOtel(workspaceId: string, events: NormalizedAgentEve
     if (event.kind === "tool_result") {
       await upsertAndFind(toolEvents, {
         workspaceId,
+        agentInstallationId,
         promptId: prompt.id,
         toolUseId: event.toolUseId,
         ingestSource: "otel",
@@ -308,7 +317,7 @@ export async function ingestOtel(workspaceId: string, events: NormalizedAgentEve
   return { accepted: events.length };
 }
 
-export async function ingestSnapshot(workspaceId: string, input: SnapshotUpload) {
+export async function ingestSnapshot(workspaceId: string, input: SnapshotUpload, agentInstallationId?: string) {
   const source = await db();
   const repository = await upsertAndFind(source.getRepository(Repository), {
     workspaceId,
@@ -323,6 +332,7 @@ export async function ingestSnapshot(workspaceId: string, input: SnapshotUpload)
   const metrics = input.metrics as any;
   const snapshot = await upsertAndFind(source.getRepository(RepoSnapshot), {
     repositoryId: repository.id,
+    agentInstallationId,
     fingerprint: input.fingerprint,
     headSha: input.headSha,
     branch: input.branch,
@@ -394,4 +404,21 @@ export async function ingestSnapshot(workspaceId: string, input: SnapshotUpload)
     .where("repository_id = :repositoryId AND head_sha = :headSha", { repositoryId: repository.id, headSha: input.headSha })
     .execute();
   return snapshot;
+}
+
+export async function registerAgent(
+  workspaceId: string,
+  input: { id: string; name: string; providers: Provider[]; cliVersion?: string },
+) {
+  const agents = (await db()).getRepository(AgentInstallation);
+  const existing = await agents.findOneBy({ id: input.id });
+  if (existing && existing.workspaceId !== workspaceId) throw new Error("agent belongs to another workspace");
+  if (existing?.revokedAt) throw new Error("agent installation has been revoked");
+  return agents.save({
+    ...(existing ?? { id: input.id, workspaceId }),
+    name: input.name,
+    providers: [...new Set([...(existing?.providers ?? []), ...input.providers])],
+    cliVersion: input.cliVersion,
+    lastSeenAt: new Date(),
+  });
 }

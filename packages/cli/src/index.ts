@@ -6,7 +6,7 @@ import {
   copyFile,
   stat,
 } from "node:fs/promises";
-import { homedir } from "node:os";
+import { homedir, hostname } from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
@@ -34,6 +34,7 @@ const ownedClaudeEnv = [
   "TOKENLENS_INSTALLED",
   "TOKENLENS_ENDPOINT",
   "TOKENLENS_INGEST_KEY",
+  "TOKENLENS_AGENT_ID",
   "TOKENLENS_CAPTURE_PROMPTS",
   "CLAUDE_CODE_ENABLE_TELEMETRY",
   "OTEL_LOGS_EXPORTER",
@@ -83,14 +84,18 @@ async function config() {
       process.env.TOKENLENS_INGEST_KEY ??
       local.key ??
       claude.env?.TOKENLENS_INGEST_KEY,
+    agentId:
+      process.env.TOKENLENS_AGENT_ID ??
+      local.agentId ??
+      claude.env?.TOKENLENS_AGENT_ID,
   };
 }
 
-async function persistConfig(endpoint: string, key: string) {
+async function persistConfig(endpoint: string, key: string, agentId: string) {
   await mkdir(appDir, { recursive: true });
   await writeFile(
     appConfigPath,
-    JSON.stringify({ endpoint, key }, null, 2) + "\n",
+    JSON.stringify({ endpoint, key, agentId }, null, 2) + "\n",
     { mode: 0o600 },
   );
 }
@@ -103,6 +108,7 @@ async function post(route: string, body: any) {
     method: "POST",
     headers: {
       authorization: `Bearer ${c.key}`,
+      ...(c.agentId ? { "x-tokenlens-agent-id": c.agentId } : {}),
       "content-type": "application/json",
     },
     body: JSON.stringify(body),
@@ -164,7 +170,7 @@ function codexHookEntry(kind: "prompt" | "tool") {
   };
 }
 
-async function installClaude(endpoint: string, key: string, force: boolean) {
+async function installClaude(endpoint: string, key: string, agentId: string, force: boolean) {
   await mkdir(path.dirname(claudeSettingsPath), { recursive: true });
   const s = await json(claudeSettingsPath);
   const env = s.env ?? {};
@@ -173,13 +179,14 @@ async function installClaude(endpoint: string, key: string, force: boolean) {
       "Existing Claude OTel log destination found. Re-run with --force to replace it after backup.",
     );
   await backup(claudeSettingsPath);
-  const headers = `Authorization=Bearer%20${encodeURIComponent(key)}`;
+  const headers = `Authorization=Bearer%20${encodeURIComponent(key)},X-TokenLens-Agent-ID=${agentId}`;
   delete env.TOKENLENS_CAPTURE_PROMPTS;
   s.env = {
     ...env,
     TOKENLENS_INSTALLED: "1",
     TOKENLENS_ENDPOINT: endpoint,
     TOKENLENS_INGEST_KEY: key,
+    TOKENLENS_AGENT_ID: agentId,
     CLAUDE_CODE_ENABLE_TELEMETRY: "1",
     OTEL_LOGS_EXPORTER: "otlp",
     OTEL_EXPORTER_OTLP_LOGS_PROTOCOL: "http/json",
@@ -231,13 +238,14 @@ function removeExistingOtel(input: string) {
   return out.join("\n").trimEnd() + "\n";
 }
 
-function codexOtelBlock(endpoint: string, key: string) {
+function codexOtelBlock(endpoint: string, key: string, agentId: string) {
   const target = JSON.stringify(`${endpoint}/api/ingest/otel/v1/logs`);
   const auth = JSON.stringify(`Bearer ${key}`);
-  return `${codexBlockStart}\n[otel]\nenvironment = "tokenlens"\nlog_user_prompt = true\nexporter = { otlp-http = { endpoint = ${target}, protocol = "json", headers = { Authorization = ${auth} } } }\n${codexBlockEnd}\n`;
+  const agent = JSON.stringify(agentId);
+  return `${codexBlockStart}\n[otel]\nenvironment = "tokenlens"\nlog_user_prompt = true\nexporter = { otlp-http = { endpoint = ${target}, protocol = "json", headers = { Authorization = ${auth}, X-TokenLens-Agent-ID = ${agent} } } }\n${codexBlockEnd}\n`;
 }
 
-async function installCodex(endpoint: string, key: string, force: boolean) {
+async function installCodex(endpoint: string, key: string, agentId: string, force: boolean) {
   await mkdir(path.dirname(codexConfigPath), { recursive: true });
   await mkdir(path.dirname(codexHooksPath), { recursive: true });
   const original = await textFile(codexConfigPath);
@@ -251,7 +259,7 @@ async function installCodex(endpoint: string, key: string, force: boolean) {
   await backup(codexConfigPath);
   await writeFile(
     codexConfigPath,
-    `${configText.trimEnd()}${configText.trim() ? "\n\n" : ""}${codexOtelBlock(endpoint, key)}`,
+    `${configText.trimEnd()}${configText.trim() ? "\n\n" : ""}${codexOtelBlock(endpoint, key, agentId)}`,
     { mode: 0o600 },
   );
 
@@ -312,6 +320,7 @@ async function install(args: string[]) {
       provider: { type: "string" },
       endpoint: { type: "string" },
       key: { type: "string" },
+      name: { type: "string" },
       force: { type: "boolean", default: false },
     },
     strict: true,
@@ -321,13 +330,28 @@ async function install(args: string[]) {
   const endpoint = endpointArg(values.endpoint);
   const key = values.key;
   if (!key) throw new Error("Use --key <workspace-ingest-key>");
+  const agentId = await deviceId();
+  const agentName = values.name?.trim() || hostname();
   const force = values.force;
-  await persistConfig(endpoint, key);
+  if (process.env.TOKENLENS_SKIP_AGENT_REGISTRATION !== "1") {
+    const registration = await fetch(`${endpoint}/api/agents/register`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
+      body: JSON.stringify({
+        id: agentId,
+        name: agentName,
+        providers: provider === "all" ? ["claude", "codex"] : [provider],
+        cliVersion: "0.1.0",
+      }),
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!registration.ok) throw new Error(`Agent registration returned ${registration.status}`);
+  }
+  await persistConfig(endpoint, key, agentId);
   if (provider === "claude" || provider === "all")
-    await installClaude(endpoint, key, force);
+    await installClaude(endpoint, key, agentId, force);
   if (provider === "codex" || provider === "all")
-    await installCodex(endpoint, key, force);
-  await deviceId();
+    await installCodex(endpoint, key, agentId, force);
   console.log(
     `Configured ${provider === "all" ? "Claude Code and Codex" : provider === "codex" ? "Codex" : "Claude Code"} telemetry and hooks for ${endpoint} (prompt capture ON).`,
   );
@@ -509,7 +533,10 @@ async function doctor(args: string[]) {
       async () => {
         const c = await config();
         const r = await fetch(`${c.endpoint}/api/health`, {
-          headers: { authorization: `Bearer ${c.key}` },
+          headers: {
+            authorization: `Bearer ${c.key}`,
+            ...(c.agentId ? { "x-tokenlens-agent-id": c.agentId } : {}),
+          },
         });
         if (!r.ok) throw Error(`HTTP ${r.status}`);
       },
@@ -586,7 +613,7 @@ async function main() {
     return sub === "prompt" ? promptHook(provider) : toolHook(provider);
   }
   console.log(
-    "repo-profiler install --provider claude|codex|all --endpoint <url> --key <key> [--force] | uninstall|doctor --provider claude|codex|all | scan [path] [--force]",
+    "repo-profiler install --provider claude|codex|all --endpoint <url> --key <key> [--name <installation-name>] [--force] | uninstall|doctor --provider claude|codex|all | scan [path] [--force]",
   );
 }
 

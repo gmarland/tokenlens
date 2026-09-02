@@ -6,6 +6,9 @@ const { dbMock, queryMock } = vi.hoisted(() => ({
 }));
 
 vi.mock("@tokenlens/database", () => ({ db: dbMock }));
+vi.mock("./auth", () => ({
+  requireWorkspace: vi.fn(async () => ({ workspaceId: "workspace-1", userId: "user-1", role: "owner" })),
+}));
 
 import {
   BenchmarkValidationError,
@@ -52,6 +55,9 @@ describe("repository structure history", () => {
       .mockResolvedValueOnce([]);
 
     const result = await repository("repo-1");
+
+    expect(queryMock.mock.calls[0][0]).toContain("r.workspace_id=");
+    expect(queryMock.mock.calls[0][1]).toEqual(["repo-1", "workspace-1"]);
 
     expect(result?.snapshots).toEqual([{
       id: "snapshot-1",
@@ -104,6 +110,7 @@ describe("repository prompt search", () => {
       "gpt-test",
       "codex",
       "%Fix 100\\%\\_done\\\\path%",
+      "workspace-1",
     ]);
   });
 
@@ -113,7 +120,7 @@ describe("repository prompt search", () => {
     await repositoryPrompts("repo-1", "context", undefined, undefined, "   ");
 
     expect(queryMock.mock.calls[0][0]).not.toContain("prompt_text ilike");
-    expect(queryMock.mock.calls[0][1]).toEqual(["repo-1", null]);
+    expect(queryMock.mock.calls[0][1]).toEqual(["repo-1", null, "workspace-1"]);
   });
 });
 
@@ -167,7 +174,7 @@ describe("prompt benchmarks", () => {
 
     expect(queryMock.mock.calls[0][0]).toContain("p.prompt_fingerprint=b.prompt_fingerprint");
     expect(queryMock.mock.calls[0][0]).toContain("u.model_count <= 1");
-    expect(queryMock.mock.calls[0][1]).toEqual(["repo-1"]);
+    expect(queryMock.mock.calls[0][1]).toEqual(["repo-1", "workspace-1"]);
   });
 
   it("serializes benchmark observations for chart clients", async () => {

@@ -37,6 +37,7 @@ describe("CLI settings", () => {
       );
       const env = {
         ...process.env,
+        TOKENLENS_SKIP_AGENT_REGISTRATION: "1",
         CLAUDE_SETTINGS_PATH: settings,
         REPO_PROFILER_HOME: state,
       };
@@ -67,6 +68,7 @@ describe("CLI settings", () => {
       expect(localConfig).toEqual({
         endpoint: "http://localhost:3000",
         key: "secret",
+        agentId: expect.any(String),
       });
       await exec(
         "pnpm",
@@ -106,6 +108,7 @@ describe("CLI settings", () => {
       );
       const env = {
         ...process.env,
+        TOKENLENS_SKIP_AGENT_REGISTRATION: "1",
         CODEX_CONFIG_PATH: config,
         CODEX_HOOKS_PATH: hooks,
         REPO_PROFILER_HOME: state,
@@ -158,6 +161,7 @@ describe("CLI settings", () => {
       const state = path.join(root, "state");
       const env = {
         ...process.env,
+        TOKENLENS_SKIP_AGENT_REGISTRATION: "1",
         CLAUDE_SETTINGS_PATH: claudeSettings,
         CODEX_CONFIG_PATH: codexConfig,
         CODEX_HOOKS_PATH: path.join(root, ".codex/hooks.json"),
@@ -196,6 +200,7 @@ describe("CLI settings", () => {
     const state = path.join(root, "state");
     const env = {
       ...process.env,
+      TOKENLENS_SKIP_AGENT_REGISTRATION: "1",
       CLAUDE_SETTINGS_PATH: settings,
       REPO_PROFILER_HOME: state,
     };
@@ -235,6 +240,7 @@ describe("CLI settings", () => {
       const state = path.join(root, "state");
       const env = {
         ...process.env,
+        TOKENLENS_SKIP_AGENT_REGISTRATION: "1",
         CLAUDE_SETTINGS_PATH: claudeSettings,
         CODEX_CONFIG_PATH: codexConfig,
         CODEX_HOOKS_PATH: codexHooks,
@@ -268,7 +274,7 @@ describe("CLI settings", () => {
       );
       expect(
         JSON.parse(await readFile(path.join(state, "config.json"), "utf8")),
-      ).toEqual({ endpoint: "http://localhost:3000", key: "secret" });
+      ).toEqual({ endpoint: "http://localhost:3000", key: "secret", agentId: expect.any(String) });
     },
     20_000,
   );

@@ -3,7 +3,7 @@ import Fastify, {
   type FastifyReply,
   type FastifyRequest,
 } from "fastify";
-import { ZodError } from "zod";
+import { z, ZodError } from "zod";
 import {
   promptHookSchema,
   snapshotSchema,
@@ -19,23 +19,36 @@ import {
   ingestPrompt as databaseIngestPrompt,
   ingestSnapshot as databaseIngestSnapshot,
   ingestTool as databaseIngestTool,
+  registerAgent as databaseRegisterAgent,
 } from "@tokenlens/database/services";
 import {
   parseOtlp as parseOpenTelemetry,
   type NormalizedAgentEvent,
 } from "@tokenlens/otel-parser";
 
-type WorkspaceIdentity = { id: string; name: string };
+type IngestIdentity = {
+  workspace: { id: string; name: string };
+  agent: { id: string } | null;
+};
 
 export type IngestApiDependencies = {
-  authenticate(header: string | null): Promise<WorkspaceIdentity | null>;
+  authenticate(header: string | null, agentId?: string | null): Promise<IngestIdentity | null>;
   checkDatabase(): Promise<void>;
-  ingestPrompt(workspaceId: string, input: PromptHook): Promise<unknown>;
-  ingestTool(workspaceId: string, input: ToolHook): Promise<unknown>;
-  ingestSnapshot(workspaceId: string, input: SnapshotUpload): Promise<{ id: string }>;
+  ingestPrompt(workspaceId: string, input: PromptHook, agentId?: string): Promise<unknown>;
+  ingestTool(workspaceId: string, input: ToolHook, agentId?: string): Promise<unknown>;
+  ingestSnapshot(workspaceId: string, input: SnapshotUpload, agentId?: string): Promise<{ id: string }>;
   parseOtlp(body: unknown): NormalizedAgentEvent[];
-  ingestOtel(workspaceId: string, events: NormalizedAgentEvent[]): Promise<unknown>;
+  ingestOtel(workspaceId: string, events: NormalizedAgentEvent[], agentId?: string): Promise<unknown>;
+  registerAgent(workspaceId: string, input: AgentRegistration): Promise<{ id: string }>;
 };
+
+const agentRegistrationSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().trim().min(1).max(120),
+  providers: z.array(z.enum(["claude", "codex"])).min(1).max(2),
+  cliVersion: z.string().trim().max(80).optional(),
+});
+type AgentRegistration = z.infer<typeof agentRegistrationSchema>;
 
 const productionDependencies: IngestApiDependencies = {
   authenticate: databaseAuthenticate,
@@ -47,6 +60,7 @@ const productionDependencies: IngestApiDependencies = {
   ingestSnapshot: databaseIngestSnapshot,
   parseOtlp: parseOpenTelemetry,
   ingestOtel: databaseIngestOtel,
+  registerAgent: databaseRegisterAgent,
 };
 
 async function workspaceFor(
@@ -55,14 +69,16 @@ async function workspaceFor(
   dependencies: IngestApiDependencies,
 ) {
   const authorization = request.headers.authorization;
-  const workspace = await dependencies.authenticate(
+  const agentHeader = request.headers["x-tokenlens-agent-id"];
+  const identity = await dependencies.authenticate(
     Array.isArray(authorization) ? authorization[0] ?? null : authorization ?? null,
+    Array.isArray(agentHeader) ? agentHeader[0] ?? null : agentHeader ?? null,
   );
-  if (!workspace) {
+  if (!identity) {
     await reply.code(401).send({ error: "unauthorized" });
     return null;
   }
-  return workspace;
+  return identity;
 }
 
 export function buildApp(
@@ -93,19 +109,33 @@ export function buildApp(
     }
   });
   app.get("/api/health", async (request, reply) => {
-    const workspace = await workspaceFor(request, reply, dependencies);
-    if (!workspace) return;
+    const identity = await workspaceFor(request, reply, dependencies);
+    if (!identity) return;
     await dependencies.checkDatabase();
-    return { ok: true, database: "healthy", workspace: workspace.name };
+    return { ok: true, database: "healthy", workspace: identity.workspace.name, agent: identity.agent?.id ?? null };
+  });
+
+  app.post("/api/agents/register", { bodyLimit: 16_000 }, async (request, reply) => {
+    const identity = await workspaceFor(request, reply, dependencies);
+    if (!identity) return;
+    try {
+      const agent = await dependencies.registerAgent(
+        identity.workspace.id,
+        agentRegistrationSchema.parse(request.body),
+      );
+      return { id: agent.id, workspace: identity.workspace.name };
+    } catch {
+      return reply.code(403).send({ error: "agent registration rejected" });
+    }
   });
 
   app.post(
     "/api/ingest/prompt",
     { bodyLimit: 64_000 },
     async (request, reply) => {
-      const workspace = await workspaceFor(request, reply, dependencies);
-      if (!workspace) return;
-      return dependencies.ingestPrompt(workspace.id, promptHookSchema.parse(request.body));
+      const identity = await workspaceFor(request, reply, dependencies);
+      if (!identity) return;
+      return dependencies.ingestPrompt(identity.workspace.id, promptHookSchema.parse(request.body), identity.agent?.id);
     },
   );
 
@@ -113,9 +143,9 @@ export function buildApp(
     "/api/ingest/tool",
     { bodyLimit: 64_000 },
     async (request, reply) => {
-      const workspace = await workspaceFor(request, reply, dependencies);
-      if (!workspace) return;
-      await dependencies.ingestTool(workspace.id, toolHookSchema.parse(request.body));
+      const identity = await workspaceFor(request, reply, dependencies);
+      if (!identity) return;
+      await dependencies.ingestTool(identity.workspace.id, toolHookSchema.parse(request.body), identity.agent?.id);
       return { accepted: true };
     },
   );
@@ -124,11 +154,12 @@ export function buildApp(
     "/api/ingest/snapshot",
     { bodyLimit: 20_000_000 },
     async (request, reply) => {
-      const workspace = await workspaceFor(request, reply, dependencies);
-      if (!workspace) return;
+      const identity = await workspaceFor(request, reply, dependencies);
+      if (!identity) return;
       const snapshot = await dependencies.ingestSnapshot(
-        workspace.id,
+        identity.workspace.id,
         snapshotSchema.parse(request.body),
+        identity.agent?.id,
       );
       return { id: snapshot.id };
     },
@@ -138,10 +169,10 @@ export function buildApp(
     "/api/ingest/otel/v1/logs",
     { bodyLimit: 5_000_000 },
     async (request, reply) => {
-      const workspace = await workspaceFor(request, reply, dependencies);
-      if (!workspace) return;
+      const identity = await workspaceFor(request, reply, dependencies);
+      if (!identity) return;
       const events = dependencies.parseOtlp(request.body);
-      await dependencies.ingestOtel(workspace.id, events);
+      await dependencies.ingestOtel(identity.workspace.id, events, identity.agent?.id);
       return { partialSuccess: { rejectedLogRecords: 0 } };
     },
   );

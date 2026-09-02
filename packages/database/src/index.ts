@@ -15,6 +15,7 @@ import { PromptBenchmarks2026090100010 } from "./migrations/2026090100010-Prompt
 import { AnalyticsIndexes2026090100020 } from "./migrations/2026090100020-AnalyticsIndexes";
 import { InsightStates2026090100030 } from "./migrations/2026090100030-InsightStates";
 import { InstructionFingerprint2026090100040 } from "./migrations/2026090100040-InstructionFingerprint";
+import { AuthenticationAndAgents2026090200000 } from "./migrations/2026090200000-AuthenticationAndAgents";
 
 export const dataSource = new DataSource({
   type: "postgres",
@@ -39,6 +40,7 @@ export const dataSource = new DataSource({
     AnalyticsIndexes2026090100020,
     InsightStates2026090100030,
     InstructionFingerprint2026090100040,
+    AuthenticationAndAgents2026090200000,
   ],
   migrationsRun: false,
   migrationsTableName: "typeorm_migrations",
@@ -58,3 +60,4 @@ export function db(): Promise<DataSource> {
 
 export * from "./entities";
 export * from "./prompt-fingerprint";
+export * from "./workspaces";

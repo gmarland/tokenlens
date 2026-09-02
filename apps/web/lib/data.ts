@@ -1,4 +1,5 @@
 import { db } from "@tokenlens/database";
+import { requireWorkspace } from "./auth";
 
 class Parameters {
   values: unknown[] = [];
@@ -17,18 +18,22 @@ const providerWhere = (provider: string | undefined, parameters: Parameters, ali
 const escapeLikePattern = (value: string) => value.replace(/[\\%_]/g, "\\$&");
 
 export async function overview(model?: string, provider?: string) {
+  const { workspaceId } = await requireWorkspace();
   const summaryParameters = new Parameters();
+  const summaryWorkspace = summaryParameters.add(workspaceId);
   const summaryModelWhere = model ? `and model=${summaryParameters.add(model)}` : "";
   const summarySelectedModel = summaryParameters.add(model ?? null);
-  const summary = (await rows(`select (select count(*)::int from repositories) repositories,
+  const summary = (await rows(`select (select count(*)::int from repositories where workspace_id=${summaryWorkspace}::uuid) repositories,
     count(distinct p.developer_id)::int developers, count(distinct p.id)::int prompts,
     coalesce(sum(a.context_tokens),0)::bigint context_tokens
     from prompts p left join lateral(select sum(input_tokens+cache_read_tokens+cache_creation_tokens) context_tokens,
       max(model) model from api_requests where prompt_id=p.id ${summaryModelWhere})a on true
-    where (${summarySelectedModel}::text is null or a.model=${summarySelectedModel} or (a.model is null and p.model=${summarySelectedModel}))
+    where p.workspace_id=${summaryWorkspace}::uuid
+      and (${summarySelectedModel}::text is null or a.model=${summarySelectedModel} or (a.model is null and p.model=${summarySelectedModel}))
       ${providerWhere(provider, summaryParameters)}`, summaryParameters))[0] ?? {};
 
   const repositoryParameters = new Parameters();
+  const repositoryWorkspace = repositoryParameters.add(workspaceId);
   const modelWhere = model ? `and model=${repositoryParameters.add(model)}` : "";
   const selectedModel = repositoryParameters.add(model ?? null);
   const repositories = await rows(`with usage as (
@@ -41,28 +46,34 @@ export async function overview(model?: string, provider?: string) {
       left join lateral(select count(distinct a.relative_file_path) files_read
         from tool_events te join tool_file_accesses a on a.tool_event_id=te.id
         where te.prompt_id=p.id and a.kind='read')t on true
-      where (${selectedModel}::text is null or u.model=${selectedModel} or (u.model is null and p.model=${selectedModel}))
+      where p.workspace_id=${repositoryWorkspace}::uuid
+        and (${selectedModel}::text is null or u.model=${selectedModel} or (u.model is null and p.model=${selectedModel}))
         ${providerWhere(provider, repositoryParameters)} group by p.repository_id
     ), latest as(select distinct on(repository_id)* from repo_snapshots order by repository_id,captured_at desc)
     select r.id,r.name,l.source_files,l.total_source_loc loc,coalesce(u.prompts,0) prompts,
       coalesce(u.median_context,0) median_context,coalesce(u.median_files,0) median_files
     from repositories r left join latest l on l.repository_id=r.id left join usage u on u.repository_id=r.id
+    where r.workspace_id=${repositoryWorkspace}::uuid
     order by median_context desc`, repositoryParameters);
 
   const modelParameters = new Parameters();
+  const modelWorkspace = modelParameters.add(workspaceId);
   const models = await rows(`select a.model,count(distinct a.prompt_id)::int count
     from api_requests a join prompts p on p.id=a.prompt_id
-    where a.model is not null ${providerWhere(provider, modelParameters)}
+    where p.workspace_id=${modelWorkspace}::uuid and a.model is not null ${providerWhere(provider, modelParameters)}
     group by a.model order by count desc`, modelParameters);
-  const providers = await rows("select provider,count(*)::int count from prompts group by provider order by count desc", new Parameters());
+  const providerParameters = new Parameters();
+  const providerWorkspace = providerParameters.add(workspaceId);
+  const providers = await rows(`select provider,count(*)::int count from prompts where workspace_id=${providerWorkspace}::uuid group by provider order by count desc`, providerParameters);
   return { summary, repositories, models, providers };
 }
 
 export async function repository(id: string, model?: string, provider?: string) {
+  const { workspaceId } = await requireWorkspace();
   const repoParameters = new Parameters();
   const repo = (await rows(`select r.*,to_jsonb(s.*) snapshot from repositories r
     left join lateral(select * from repo_snapshots where repository_id=r.id order by captured_at desc limit 1)s on true
-    where r.id=${repoParameters.add(id)}::uuid`, repoParameters))[0];
+    where r.id=${repoParameters.add(id)}::uuid and r.workspace_id=${repoParameters.add(workspaceId)}::uuid`, repoParameters))[0];
   if (!repo) return null;
 
   const snapshotParameters = new Parameters();
@@ -160,6 +171,7 @@ export async function repositoryPrompts(
   provider?: string,
   search?: string,
 ) {
+  const { workspaceId } = await requireWorkspace();
   const order = ({ context: "context_tokens desc", cost: "cost_usd desc nulls last", files: "files_read desc",
     repeated: "repeated_reads desc", edit: "time_to_first_edit_ms desc" } as Record<string, string>)[sort] ?? "started_at desc";
   const parameters = new Parameters();
@@ -185,16 +197,17 @@ export async function repositoryPrompts(
       from tool_events t left join tool_file_accesses a on a.tool_event_id=t.id
       left join repo_snapshot_files f on f.snapshot_id=p.snapshot_id and f.path=a.relative_file_path
       where t.prompt_id=p.id)t on true
-    where p.repository_id=${repositoryId}::uuid ${promptProviderWhere} ${promptSearchWhere}
+    where p.repository_id=${repositoryId}::uuid and p.workspace_id=${parameters.add(workspaceId)}::uuid ${promptProviderWhere} ${promptSearchWhere}
       and (${selectedModel}::text is null or u.model=${selectedModel} or (u.model is null and p.model=${selectedModel}))
     order by ${order}`, parameters);
 }
 
 export async function promptDetail(id: string) {
+  const { workspaceId } = await requireWorkspace();
   const promptParameters = new Parameters();
   const prompt = (await rows(`select p.*,r.name repository_name,d.email from prompts p
     left join repositories r on r.id=p.repository_id left join developers d on d.id=p.developer_id
-    where p.id=${promptParameters.add(id)}::uuid`, promptParameters))[0];
+    where p.id=${promptParameters.add(id)}::uuid and p.workspace_id=${promptParameters.add(workspaceId)}::uuid`, promptParameters))[0];
   if (!prompt) return null;
   const apiParameters = new Parameters();
   const api = await rows(`select * from api_requests where prompt_id=${apiParameters.add(id)}::uuid order by timestamp`, apiParameters);
@@ -224,6 +237,7 @@ export async function createPromptBenchmark(
   requestedModel?: string,
   requestedName?: string,
 ) {
+  const { workspaceId } = await requireWorkspace();
   const sourceParameters = new Parameters();
   const source = (await rows(`select p.id,p.workspace_id,p.repository_id,p.provider,p.prompt_text,p.prompt_fingerprint,
       case when count(distinct coalesce(a.model,p.model)) <= 1
@@ -232,6 +246,7 @@ export async function createPromptBenchmark(
     from prompts p left join api_requests a on a.prompt_id=p.id
     where p.id=${sourceParameters.add(sourcePromptId)}::uuid
       and p.repository_id=${sourceParameters.add(repositoryId)}::uuid
+      and p.workspace_id=${sourceParameters.add(workspaceId)}::uuid
     group by p.id`, sourceParameters))[0];
 
   if (!source) throw new BenchmarkValidationError("Prompt not found in this repository", 404);
@@ -264,6 +279,7 @@ export async function createPromptBenchmark(
 }
 
 export async function repositoryBenchmarks(repositoryId: string) {
+  const { workspaceId } = await requireWorkspace();
   const parameters = new Parameters();
   return rows(`select b.id,b.name,b.provider,b.model,b.created_at,
       coalesce(s.runs,0)::int runs,s.last_seen_at,s.median_context
@@ -286,15 +302,16 @@ export async function repositoryBenchmarks(repositoryId: string) {
           and u.model_count <= 1 and coalesce(u.model,p.model)=b.model
       )run
     )s on true
-    where b.repository_id=${parameters.add(repositoryId)}::uuid and b.archived_at is null
+    where b.repository_id=${parameters.add(repositoryId)}::uuid and b.workspace_id=${parameters.add(workspaceId)}::uuid and b.archived_at is null
     order by s.last_seen_at desc nulls last,b.created_at desc`, parameters);
 }
 
 export async function benchmarkDetail(id: string) {
+  const { workspaceId } = await requireWorkspace();
   const benchmarkParameters = new Parameters();
   const benchmark = (await rows(`select b.*,r.name repository_name
     from prompt_benchmarks b join repositories r on r.id=b.repository_id
-    where b.id=${benchmarkParameters.add(id)}::uuid and b.archived_at is null`, benchmarkParameters))[0];
+    where b.id=${benchmarkParameters.add(id)}::uuid and b.workspace_id=${benchmarkParameters.add(workspaceId)}::uuid and b.archived_at is null`, benchmarkParameters))[0];
   if (!benchmark) return null;
 
   const pointParameters = new Parameters();
@@ -361,12 +378,15 @@ export async function benchmarkDetail(id: string) {
 }
 
 export async function archiveBenchmark(id: string) {
+  const { workspaceId } = await requireWorkspace();
   const parameters = new Parameters();
   return (await rows(`update prompt_benchmarks set archived_at=now()
-    where id=${parameters.add(id)}::uuid and archived_at is null returning id,repository_id`, parameters))[0] ?? null;
+    where id=${parameters.add(id)}::uuid and workspace_id=${parameters.add(workspaceId)}::uuid and archived_at is null returning id,repository_id`, parameters))[0] ?? null;
 }
 
 export async function developersList() {
+  const { workspaceId } = await requireWorkspace();
+  const parameters = new Parameters();
   return rows(`select d.*,count(p.id)::int prompts from developers d left join prompts p on p.developer_id=d.id
-    group by d.id order by d.last_seen_at desc`, new Parameters());
+    where d.workspace_id=${parameters.add(workspaceId)}::uuid group by d.id order by d.last_seen_at desc`, parameters);
 }

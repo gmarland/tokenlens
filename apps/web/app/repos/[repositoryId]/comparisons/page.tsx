@@ -10,6 +10,7 @@ import {
   Page,
   Panel,
   SectionTitle,
+  Toolbar,
 } from "../../../../components/ui";
 import { repository } from "../../../../lib/data";
 import { repositoryInsightBundle } from "../../../../lib/insights";
@@ -33,14 +34,17 @@ export default async function Comparisons({
   );
   return (
     <Page>
-      <BackLink href="/">← All repositories</BackLink>
-      <Eyebrow sx={{ mt: 3 }}>Controlled comparison candidates</Eyebrow>
-      <Typography variant="h1">Matched models · {repo.repo.name}</Typography>
-      <Intro>
-        Only exact normalized prompt text is compared. TokenLens does not
-        collect assistant responses, so lower usage is a candidate for a
-        separate quality evaluation—not a routing recommendation.
-      </Intro>
+      <Toolbar>
+        <Box>
+          <Eyebrow>Controlled comparison candidates</Eyebrow>
+          <Typography variant="h1">{repo.repo.name}</Typography>
+          <Intro>
+            Only exact normalized prompt text is compared. TokenLens does not
+            collect assistant responses, so lower usage is a candidate for a
+            separate quality evaluation—not a routing recommendation.
+          </Intro>
+        </Box>
+      </Toolbar>
       <RepositoryNav repositoryId={repositoryId} />
       <SectionTitle>Opportunities</SectionTitle>
       <Panel>

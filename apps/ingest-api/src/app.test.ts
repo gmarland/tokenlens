@@ -5,9 +5,9 @@ const authorization = { authorization: "Bearer test-key" };
 
 function dependencies(): IngestApiDependencies {
   return {
-    authenticate: vi.fn(async (header) =>
+    authenticate: vi.fn(async (header, agentId) =>
       header === authorization.authorization
-        ? { id: "workspace-1", name: "Test workspace" }
+        ? { workspace: { id: "workspace-1", name: "Test workspace" }, agent: agentId ? { id: agentId } : null }
         : null,
     ),
     checkDatabase: vi.fn(async () => undefined),
@@ -16,6 +16,7 @@ function dependencies(): IngestApiDependencies {
     ingestSnapshot: vi.fn(async () => ({ id: "snapshot-1" })),
     parseOtlp: vi.fn(() => []),
     ingestOtel: vi.fn(async () => undefined),
+    registerAgent: vi.fn(async (_workspaceId, input) => ({ id: input.id })),
   };
 }
 
@@ -46,6 +47,7 @@ describe("ingestion API", () => {
       ok: true,
       database: "healthy",
       workspace: "Test workspace",
+      agent: null,
     });
     await app.close();
   });
@@ -91,7 +93,7 @@ describe("ingestion API", () => {
         relativeFilePath: "src/a.ts",
         attribution: "explicit_tool",
       }],
-    }));
+    }), undefined);
 
     const snapshot = await app.inject({
       method: "POST",
@@ -113,6 +115,7 @@ describe("ingestion API", () => {
     expect(service.ingestSnapshot).toHaveBeenCalledWith(
       "workspace-1",
       expect.objectContaining({ commits: [] }),
+      undefined,
     );
 
     const otlp = await app.inject({
@@ -122,7 +125,35 @@ describe("ingestion API", () => {
       payload: { resourceLogs: [] },
     });
     expect(otlp.json()).toEqual({ partialSuccess: { rejectedLogRecords: 0 } });
-    expect(service.ingestOtel).toHaveBeenCalledWith("workspace-1", []);
+    expect(service.ingestOtel).toHaveBeenCalledWith("workspace-1", [], undefined);
+    await app.close();
+  });
+
+  it("registers and attributes an installation independently of the workspace key", async () => {
+    const app = buildApp(service);
+    const agentId = "11111111-1111-4111-8111-111111111111";
+    const registration = await app.inject({
+      method: "POST",
+      url: "/api/agents/register",
+      headers: authorization,
+      payload: { id: agentId, name: "Gareth's Mac", providers: ["codex"] },
+    });
+    expect(registration.statusCode).toBe(200);
+    expect(service.registerAgent).toHaveBeenCalledWith("workspace-1", expect.objectContaining({ id: agentId }));
+
+    await app.inject({
+      method: "POST",
+      url: "/api/ingest/prompt",
+      headers: { ...authorization, "x-tokenlens-agent-id": agentId },
+      payload: {
+        provider: "codex",
+        promptId: "prompt-1",
+        sessionId: "session-1",
+        promptLength: 5,
+        promptText: "hello",
+      },
+    });
+    expect(service.ingestPrompt).toHaveBeenCalledWith("workspace-1", expect.anything(), agentId);
     await app.close();
   });
 

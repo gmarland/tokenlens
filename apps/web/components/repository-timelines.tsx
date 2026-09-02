@@ -25,12 +25,7 @@ export function RepositoryBehaviourTimeline({
       key={`behaviour:${behaviourKey}`}
       timestamps={prompts.map((prompt) => prompt.startedAt)}
     >
-      <Box sx={{ mt: 6, mb: 2 }}>
-        <Toolbar>
-          <SectionTitle>Agent behaviour over time</SectionTitle>
-          <BackLink href={promptHref}>Explore prompts →</BackLink>
-        </Toolbar>
-      </Box>
+      <SectionTitle>Agent behaviour over time</SectionTitle>
       <Panel>
         <AgentBehaviour prompts={prompts} />
       </Panel>

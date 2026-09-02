@@ -35,8 +35,22 @@ pnpm dev
 ```
 
 Open the dashboard at <http://localhost:3000>. The ingestion API runs at
-<http://localhost:3001>. The default development ingest key is
+<http://localhost:3001>. Sign-in emails are captured locally at
+<http://localhost:8025>. The default development ingest key is
 `development-key-change-me`; replace it outside local development.
+
+## Authentication and workspaces
+
+The dashboard requires a verified email magic link. Google sign-in is also
+enabled when `AUTH_GOOGLE_ID` and `AUTH_GOOGLE_SECRET` are configured. Each new
+account receives a workspace and owner membership; verified
+`gareth.marland@gmail.com` claims the existing unowned workspace. Owners can
+invite other users and create, rotate, or revoke write-only ingestion keys from
+the workspace settings page.
+
+Set a long random `AUTH_SECRET` in every environment. Configure `EMAIL_SERVER`
+and `EMAIL_FROM` for production mail delivery. Local development uses Mailpit
+from Docker Compose.
 
 ## Agent setup
 
@@ -44,8 +58,8 @@ Install the package so `repo-profiler` is on `PATH`, then choose one provider or
 install both:
 
 ```bash
-repo-profiler install --provider claude --endpoint http://localhost:3001 --key development-key-change-me
-repo-profiler install --provider codex --endpoint http://localhost:3001 --key development-key-change-me
+repo-profiler install --provider claude --endpoint http://localhost:3001 --key development-key-change-me --name "My Mac"
+repo-profiler install --provider codex --endpoint http://localhost:3001 --key development-key-change-me --name "My Mac"
 # or: repo-profiler install --provider all ...
 ```
 
@@ -70,6 +84,10 @@ settings and hooks, and installs asynchronous `UserPromptSubmit` and
 `~/.codex/hooks.json` and `~/.codex/config.toml`, adding a marked TokenLens OTel
 block. Existing non-TokenLens OTel destinations are preserved unless `--force`
 is explicitly supplied. Installation is idempotent.
+
+Installation registers a stable, named CLI installation in the key's
+workspace. Hook and OTEL requests include its installation ID, allowing owners
+to see and revoke individual installations without rotating the workspace key.
 
 Scan on demand with `repo-profiler scan .`; `--force` bypasses the local snapshot
 cache. Remove only TokenLens-owned settings with

@@ -19,6 +19,70 @@ export class Workspace {
   @CreateDateColumn({ name: "created_at", type: "timestamptz" }) createdAt!: Date;
 }
 
+@Entity("users")
+export class User {
+  @PrimaryGeneratedColumn("uuid") id!: string;
+  @Column("text", { nullable: true }) name!: string | null;
+  @Column("text", { unique: true }) email!: string;
+  @Column("timestamptz", { name: "emailVerified", nullable: true }) emailVerified!: Date | null;
+  @Column("text", { nullable: true }) image!: string | null;
+  @CreateDateColumn({ name: "created_at", type: "timestamptz" }) createdAt!: Date;
+}
+
+@Entity("workspace_memberships")
+@Index("workspace_membership_user_idx", ["userId"])
+@Index("workspace_membership_workspace_user_uq", ["workspaceId", "userId"], { unique: true })
+export class WorkspaceMembership {
+  @PrimaryGeneratedColumn("uuid") id!: string;
+  @Column("uuid", { name: "workspace_id" }) workspaceId!: string;
+  @Column("uuid", { name: "user_id" }) userId!: string;
+  @Column("text", { default: "member" }) role!: "owner" | "member";
+  @CreateDateColumn({ name: "created_at", type: "timestamptz" }) createdAt!: Date;
+}
+
+@Entity("workspace_api_keys")
+@Index("workspace_api_key_hash_uq", ["keyHash"], { unique: true })
+@Index("workspace_api_key_workspace_idx", ["workspaceId"])
+export class WorkspaceApiKey {
+  @PrimaryGeneratedColumn("uuid") id!: string;
+  @Column("uuid", { name: "workspace_id" }) workspaceId!: string;
+  @Column("text", { name: "key_hash" }) keyHash!: string;
+  @Column("text", { name: "key_prefix" }) keyPrefix!: string;
+  @Column("text", { default: "Default" }) name!: string;
+  @Column("uuid", { name: "created_by_user_id", nullable: true }) createdByUserId!: string | null;
+  @CreateDateColumn({ name: "created_at", type: "timestamptz" }) createdAt!: Date;
+  @Column("timestamptz", { name: "last_used_at", nullable: true }) lastUsedAt!: Date | null;
+  @Column("timestamptz", { name: "revoked_at", nullable: true }) revokedAt!: Date | null;
+}
+
+@Entity("workspace_invitations")
+@Index("workspace_invitation_token_uq", ["tokenHash"], { unique: true })
+@Index("workspace_invitation_workspace_idx", ["workspaceId"])
+export class WorkspaceInvitation {
+  @PrimaryGeneratedColumn("uuid") id!: string;
+  @Column("uuid", { name: "workspace_id" }) workspaceId!: string;
+  @Column("text") email!: string;
+  @Column("text", { default: "member" }) role!: "owner" | "member";
+  @Column("text", { name: "token_hash" }) tokenHash!: string;
+  @Column("uuid", { name: "invited_by_user_id" }) invitedByUserId!: string;
+  @Column("timestamptz", { name: "expires_at" }) expiresAt!: Date;
+  @Column("timestamptz", { name: "accepted_at", nullable: true }) acceptedAt!: Date | null;
+  @CreateDateColumn({ name: "created_at", type: "timestamptz" }) createdAt!: Date;
+}
+
+@Entity("agent_installations")
+@Index("agent_installation_workspace_idx", ["workspaceId"])
+export class AgentInstallation {
+  @PrimaryGeneratedColumn("uuid") id!: string;
+  @Column("uuid", { name: "workspace_id" }) workspaceId!: string;
+  @Column("text") name!: string;
+  @Column("text", { array: true, default: () => "'{}'" }) providers!: string[];
+  @Column("text", { name: "cli_version", nullable: true }) cliVersion!: string | null;
+  @CreateDateColumn({ name: "created_at", type: "timestamptz" }) createdAt!: Date;
+  @Column("timestamptz", { name: "last_seen_at", nullable: true }) lastSeenAt!: Date | null;
+  @Column("timestamptz", { name: "revoked_at", nullable: true }) revokedAt!: Date | null;
+}
+
 @Entity("developers")
 @Index("developer_workspace_idx", ["workspaceId"])
 @Index("developer_workspace_provider_external_uq", ["workspaceId", "provider", "externalId"], { unique: true })
@@ -52,6 +116,7 @@ export class Repository {
 export class RepoSnapshot {
   @PrimaryGeneratedColumn("uuid") id!: string;
   @Column("uuid", { name: "repository_id" }) repositoryId!: string;
+  @Column("uuid", { name: "agent_installation_id", nullable: true }) agentInstallationId!: string | null;
   @Column("text") fingerprint!: string;
   @Column("text", { name: "head_sha" }) headSha!: string;
   @Column("text") branch!: string;
@@ -145,6 +210,7 @@ export class RepoCommit {
 export class Prompt {
   @PrimaryGeneratedColumn("uuid") id!: string;
   @Column("uuid", { name: "workspace_id" }) workspaceId!: string;
+  @Column("uuid", { name: "agent_installation_id", nullable: true }) agentInstallationId!: string | null;
   @Column("text", { default: "claude" }) provider!: string;
   @Column("text", { name: "external_prompt_id" }) externalPromptId!: string;
   @Column("text", { name: "session_id", nullable: true }) sessionId!: string | null;
@@ -211,6 +277,7 @@ export class ApiRequest {
 export class ToolEvent {
   @PrimaryGeneratedColumn("uuid") id!: string;
   @Column("uuid", { name: "workspace_id" }) workspaceId!: string;
+  @Column("uuid", { name: "agent_installation_id", nullable: true }) agentInstallationId!: string | null;
   @Column("uuid", { name: "prompt_id" }) promptId!: string;
   @Column("text", { name: "tool_use_id" }) toolUseId!: string;
   @Column("text", { name: "ingest_source", default: "unknown" }) ingestSource!: string;
@@ -246,4 +313,4 @@ export class InsightStateRecord {
   @Column("timestamptz", { name: "updated_at", default: () => "now()" }) updatedAt!: Date;
 }
 
-export const entities = [Workspace, Developer, Repository, RepoSnapshot, RepoSnapshotFile, RepoCommit, Prompt, PromptBenchmark, ApiRequest, ToolEvent, ToolFileAccess, InsightStateRecord];
+export const entities = [Workspace, User, WorkspaceMembership, WorkspaceApiKey, WorkspaceInvitation, AgentInstallation, Developer, Repository, RepoSnapshot, RepoSnapshotFile, RepoCommit, Prompt, PromptBenchmark, ApiRequest, ToolEvent, ToolFileAccess, InsightStateRecord];
