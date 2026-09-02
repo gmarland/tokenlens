@@ -41,7 +41,7 @@ export default async function Layout({ children }: { children: React.ReactNode }
                   mx: "auto",
                   px: { xs: 2.5, sm: 4, md: 8 },
                   display: "grid",
-                  gridTemplateColumns: { xs: "1fr auto", sm: "1fr auto 1fr" },
+                  gridTemplateColumns: "1fr auto",
                 }}
               >
                 <MuiLink
@@ -76,9 +76,10 @@ export default async function Layout({ children }: { children: React.ReactNode }
                 <Box
                   component="nav"
                   sx={{
-                    display: { xs: "none", sm: "flex" },
-                    gap: { sm: 2.5, md: 5 },
-                    justifySelf: "center",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: { xs: 2, sm: 2.5, md: 5 },
+                    justifySelf: "end",
                   }}
                 >
                   <MuiLink
@@ -86,7 +87,7 @@ export default async function Layout({ children }: { children: React.ReactNode }
                     href="/"
                     color="inherit"
                     underline="hover"
-                    sx={{ fontSize: 13, fontWeight: 800 }}
+                    sx={{ display: { xs: "none", sm: "inline" }, fontSize: 13, fontWeight: 800 }}
                   >
                     Repositories
                   </MuiLink>
@@ -96,22 +97,22 @@ export default async function Layout({ children }: { children: React.ReactNode }
                       href="/members"
                       color="inherit"
                       underline="hover"
-                      sx={{ fontSize: 13, fontWeight: 800 }}
+                      sx={{ display: { xs: "none", sm: "inline" }, fontSize: 13, fontWeight: 800 }}
                     >
                       Members
                     </MuiLink>
                   ) : null}
+                  {session?.user ? (
+                    <>
+                      {workspaceRole === "owner" ? (
+                        <MuiLink component={Link} href="/api-keys" color="inherit" underline="hover" sx={{ fontSize: 13, fontWeight: 800 }}>
+                          API Keys
+                        </MuiLink>
+                      ) : null}
+                      <AccountMenu signOutAction={async () => { "use server"; await signOut({ redirectTo: "/login" }); }} />
+                    </>
+                  ) : null}
                 </Box>
-                {session?.user ? (
-                  <Box sx={{ justifySelf: "end", display: "flex", alignItems: "center", gap: 2 }}>
-                    {workspaceRole === "owner" ? (
-                      <MuiLink component={Link} href="/api-keys" color="inherit" underline="hover" sx={{ fontSize: 13, fontWeight: 800 }}>
-                        API Keys
-                      </MuiLink>
-                    ) : null}
-                    <AccountMenu signOutAction={async () => { "use server"; await signOut({ redirectTo: "/login" }); }} />
-                  </Box>
-                ) : <Box />}
               </Toolbar>
             </AppBar>
             {children}
