@@ -24,13 +24,13 @@ const theme = createTheme({
     fontFamily: 'Arial, Helvetica, "Liberation Sans", sans-serif',
     fontSize: 14,
     h1: {
-      fontSize: "clamp(3.15rem, 6vw, 6rem)",
+      fontSize: "clamp(2.1rem, 3.375vw, 3.29rem)",
       fontWeight: 800,
       lineHeight: 0.9,
       letterSpacing: "-0.067em",
     },
     h2: {
-      fontSize: "clamp(2.25rem, 4vw, 3.65rem)",
+      fontSize: "clamp(1.5rem, 2.25vw, 2rem)",
       fontWeight: 800,
       lineHeight: 0.94,
       letterSpacing: "-0.055em",
