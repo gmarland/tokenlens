@@ -1,5 +1,6 @@
 import { db } from "@tokenlens/database";
 import { requireWorkspace } from "./auth";
+import { promptTitle } from "./prompt-presentation";
 
 class Parameters {
   values: unknown[] = [];
@@ -166,13 +167,13 @@ export async function repository(id: string, model?: string, provider?: string) 
 
 export async function repositoryPrompts(
   id: string,
-  sort = "context",
+  sort = "date",
   model?: string,
   provider?: string,
   search?: string,
 ) {
   const { workspaceId } = await requireWorkspace();
-  const order = ({ context: "context_tokens desc", cost: "cost_usd desc nulls last", files: "files_read desc",
+  const order = ({ date: "started_at desc", context: "context_tokens desc", cost: "cost_usd desc nulls last", files: "files_read desc",
     repeated: "repeated_reads desc", edit: "time_to_first_edit_ms desc" } as Record<string, string>)[sort] ?? "started_at desc";
   const parameters = new Parameters();
   const repositoryId = parameters.add(id);
@@ -263,7 +264,7 @@ export async function createPromptBenchmark(
   if (model !== source.effective_model) {
     throw new BenchmarkValidationError("The selected model does not match this prompt");
   }
-  const fallbackName = String(source.prompt_text).replace(/\s+/g, " ").trim().slice(0, 80) || "Benchmark prompt";
+  const fallbackName = promptTitle(String(source.prompt_text), 80, "Benchmark prompt");
   const name = requestedName?.trim().slice(0, 120) || fallbackName;
 
   const insertParameters = new Parameters();

@@ -14,6 +14,7 @@ import {
   Toolbar,
 } from "../../../../components/ui";
 import { repository, repositoryPrompts } from "../../../../lib/data";
+import { promptTitle } from "../../../../lib/prompt-presentation";
 import Box from "@mui/material/Box";
 import { notFound } from "next/navigation";
 
@@ -90,7 +91,7 @@ export default async function Prompts({ params, searchParams }: any) {
             provider: String(p.provider),
             developer: String(p.email ?? "Identity pending"),
             prompt: p.prompt_text
-              ? String(p.prompt_text).slice(0, 60)
+              ? promptTitle(String(p.prompt_text), 60)
               : `Legacy prompt #${String(p.external_prompt_id).slice(0, 8)}`,
             model: String(p.model ?? "—"),
             context: Number(p.context_tokens ?? 0),

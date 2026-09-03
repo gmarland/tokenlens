@@ -4,7 +4,11 @@ const { db } = vi.hoisted(() => ({ db: vi.fn() }));
 
 vi.mock("./index", () => ({ db }));
 
-import { updateUserProfile } from "./workspaces";
+import {
+  createWorkspaceInvitation,
+  listWorkspaceInvitations,
+  updateUserProfile,
+} from "./workspaces";
 
 describe("user profiles", () => {
   beforeEach(() => vi.clearAllMocks());
@@ -38,5 +42,47 @@ describe("user profiles", () => {
       name: "Ada",
       email: "ada@example.com",
     })).resolves.toBeNull();
+  });
+});
+
+describe("workspace invitations", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("lists unaccepted invitations without duplicating active members", async () => {
+    const invitations = [{
+      id: "invitation-1",
+      email: "grace@example.com",
+      role: "member",
+      status: "invited",
+    }];
+    const query = vi.fn(async () => invitations);
+    db.mockResolvedValue({ query });
+
+    await expect(listWorkspaceInvitations("workspace-1")).resolves.toEqual(invitations);
+
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining("i.accepted_at is null"),
+      ["workspace-1"],
+    );
+    expect(query.mock.calls[0][0]).toContain("not exists");
+    expect(query.mock.calls[0][0]).toContain("'expired'");
+  });
+
+  it("does not create an invitation for an existing member", async () => {
+    const query = vi.fn(async () => []);
+    db.mockResolvedValue({ query });
+
+    await expect(createWorkspaceInvitation(
+      "workspace-1",
+      "owner-1",
+      "  ADA@EXAMPLE.COM  ",
+      "member",
+    )).resolves.toBeNull();
+
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining("from workspace_memberships m join users u"),
+      expect.arrayContaining(["workspace-1", "owner-1", "ada@example.com", "member"]),
+    );
+    expect(query.mock.calls[0][0]).toContain("created_at=now()");
   });
 });

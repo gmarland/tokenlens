@@ -142,6 +142,24 @@ export async function listWorkspaceMembers(workspaceId: string) {
   );
 }
 
+export async function listWorkspaceInvitations(workspaceId: string) {
+  const database = await db();
+  return database.query(
+    `select i.id,i.email,i.role,i.created_at,i.expires_at,
+            case when i.expires_at<=now() then 'expired' else 'invited' end status
+     from workspace_invitations i
+     where i.workspace_id=$1
+       and i.accepted_at is null
+       and not exists(
+         select 1
+         from workspace_memberships m join users u on u.id=m.user_id
+         where m.workspace_id=i.workspace_id and lower(u.email)=lower(i.email)
+       )
+     order by i.created_at desc`,
+    [workspaceId],
+  );
+}
+
 export async function createWorkspaceApiKey(workspaceId: string, userId: string, name: string) {
   const key = generateApiKey();
   const database = await db();
@@ -178,13 +196,19 @@ export async function createWorkspaceInvitation(
   const database = await db();
   const rows = await database.query(
     `insert into workspace_invitations(workspace_id,email,role,token_hash,invited_by_user_id,expires_at)
-     values($1,$2,$3,$4,$5,now()+interval '7 days')
+     select $1,$3,$4,$5,$2,now()+interval '7 days'
+     where not exists(
+       select 1
+       from workspace_memberships m join users u on u.id=m.user_id
+       where m.workspace_id=$1 and lower(u.email)=$3
+     )
      on conflict(workspace_id,lower(email)) where accepted_at is null
-     do update set role=excluded.role,token_hash=excluded.token_hash,invited_by_user_id=excluded.invited_by_user_id,expires_at=excluded.expires_at
-     returning id,email,role,expires_at`,
-    [workspaceId, normalizedEmail, role, hashKey(token), userId],
+     do update set role=excluded.role,token_hash=excluded.token_hash,invited_by_user_id=excluded.invited_by_user_id,created_at=now(),expires_at=excluded.expires_at
+     returning id,email,role,created_at,expires_at`,
+    [workspaceId, userId, normalizedEmail, role, hashKey(token)],
   );
-  return { ...rows[0], token };
+  if (!rows[0]) return null;
+  return { ...rows[0], status: "invited" as const, token };
 }
 
 export async function revokeAgentInstallation(workspaceId: string, agentId: string) {

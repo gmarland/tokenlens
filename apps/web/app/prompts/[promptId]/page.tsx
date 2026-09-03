@@ -12,6 +12,7 @@ import { BackLink, Cards, EmptyState, Eyebrow, Intro, MetricCard, Page, Panel, S
 import { promptDetail } from "../../../lib/data";
 import { promptInsight } from "../../../lib/insights";
 import { compact, money, duration, date } from "../../../lib/format";
+import { parsePromptPresentation, promptTitle } from "../../../lib/prompt-presentation";
 import { canonicalToolActions } from "../../../lib/tool-events";
 
 export const dynamic = "force-dynamic";
@@ -55,13 +56,14 @@ export default async function Prompt({ params }: any) {
   const comparisons = p.repository_id
     ? await promptInsight(p.id, p.repository_id, p.provider, promptModels.length === 1 ? promptModels[0] : p.model)
     : [];
+  const presentation = p.prompt_text ? parsePromptPresentation(String(p.prompt_text)) : null;
   const cards = (items: [string, string][]) => <Cards>{items.map(([label, value]) => <MetricCard key={label} label={label} value={value} />)}</Cards>;
 
   return <Page>
     <BackLink href={`/repos/${p.repository_id}/prompts`}>← Prompts</BackLink>
     <Eyebrow sx={{ mt: 3 }}>{p.repository_name} · {date(p.started_at)} · {p.provider}</Eyebrow>
-    <Typography variant="h1">{p.prompt_text ? p.prompt_text.slice(0, 100) : `Prompt #${p.external_prompt_id.slice(0, 10)}`}</Typography>
-    <Intro>{p.email ?? "Identity pending"} · Prompt length {compact(p.prompt_length)} characters · No tool contents are stored.</Intro>
+    <Typography variant="h1">{p.prompt_text ? promptTitle(String(p.prompt_text), 100) : `Prompt #${p.external_prompt_id.slice(0, 10)}`}</Typography>
+    <Intro>{p.email ?? "Identity pending"} · Captured prompt length {compact(p.prompt_length)} characters · No tool contents are stored.</Intro>
     <Box id="create-benchmark" sx={{ scrollMarginTop: 16 }}>{p.repository_id && p.prompt_text && promptModels.length === 1
       ? <CreateBenchmarkButton repositoryId={p.repository_id} promptId={p.id} model={promptModels[0]} />
       : <Typography color="text.secondary" sx={{ mt: 2 }} variant="body2">
@@ -71,6 +73,14 @@ export default async function Prompt({ params }: any) {
               ? "This prompt used multiple models, so its aggregate measurements cannot form a single-model benchmark."
               : "Benchmarking will be available when model telemetry arrives."}
         </Typography>}</Box>
+    {presentation ? <>
+      <SectionTitle>User request</SectionTitle>
+      <Panel><Typography sx={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{presentation.requestText || "No request text was supplied."}</Typography></Panel>
+      {presentation.hasIdeContext ? <Box component="details" sx={{ mt: 3 }}>
+        <Typography component="summary" sx={{ cursor: "pointer", fontWeight: 800 }}>Show complete captured prompt</Typography>
+        <Panel sx={{ mt: 2 }}><Typography sx={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{presentation.rawText}</Typography></Panel>
+      </Box> : null}
+    </> : null}
     {comparisons.length ? <><SectionTitle>Compared with repository baseline</SectionTitle><Panel><InsightCards insights={comparisons} /></Panel></> : null}
     <SectionTitle>Usage</SectionTitle>{cards([
       ["Fresh input", cacheMetricsAvailable ? compact(fresh) : "—"], ["Cache read", cacheMetricsAvailable ? compact(cacheRead) : "—"], ["Cache creation", cacheMetricsAvailable ? compact(cacheCreate) : "—"], ["Output", compact(output)],

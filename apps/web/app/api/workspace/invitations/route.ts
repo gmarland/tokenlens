@@ -12,10 +12,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "valid email and role are required" }, { status: 400 });
   }
   const invitation = await createWorkspaceInvitation(access.workspaceId, access.userId, email, role);
+  if (!invitation) {
+    return NextResponse.json({ error: "That email address is already a workspace member." }, { status: 409 });
+  }
   const emailSent = await sendWorkspaceInvitation({
     email,
     workspaceName: access.workspaceName,
     inviterEmail: access.email,
   }).catch(() => false);
-  return NextResponse.json({ invitation, emailSent }, { status: 201 });
+  return NextResponse.json({
+    invitation: {
+      id: invitation.id,
+      email: invitation.email,
+      role: invitation.role,
+      created_at: invitation.created_at,
+      expires_at: invitation.expires_at,
+      status: invitation.status,
+    },
+    emailSent,
+  }, { status: 201 });
 }

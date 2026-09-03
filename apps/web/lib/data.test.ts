@@ -97,6 +97,14 @@ describe("repository prompt search", () => {
     dbMock.mockResolvedValue({ query: queryMock });
   });
 
+  it("sorts prompts by creation date descending by default", async () => {
+    queryMock.mockResolvedValueOnce([]);
+
+    await repositoryPrompts("repo-1");
+
+    expect(queryMock.mock.calls[0][0]).toContain("order by started_at desc");
+  });
+
   it("searches full prompt bodies with a parameterized, case-insensitive literal pattern", async () => {
     queryMock.mockResolvedValueOnce([]);
 
@@ -151,6 +159,35 @@ describe("prompt benchmarks", () => {
     expect(queryMock.mock.calls[1][0]).toContain("on conflict(repository_id,provider,model,prompt_fingerprint)");
     expect(queryMock.mock.calls[1][1]).toEqual([
       "workspace-1", "repo-1", "prompt-1", "Fix the auth flow", "codex", "gpt-test", "Fix the auth flow", "abc123",
+    ]);
+  });
+
+  it("names an IDE prompt benchmark from its user request while preserving the raw match text", async () => {
+    const promptText = [
+      "# Context from my IDE setup:",
+      "",
+      "## Active file: src/auth.ts",
+      "",
+      "## My request:",
+      "Fix the auth flow",
+    ].join("\n");
+    queryMock
+      .mockResolvedValueOnce([{
+        id: "prompt-1",
+        workspace_id: "workspace-1",
+        repository_id: "repo-1",
+        provider: "codex",
+        prompt_text: promptText,
+        prompt_fingerprint: "abc123",
+        effective_model: "gpt-test",
+        model_count: 1,
+      }])
+      .mockResolvedValueOnce([{ id: "benchmark-1", name: "Fix the auth flow", model: "gpt-test", provider: "codex" }]);
+
+    await createPromptBenchmark("repo-1", "prompt-1", "gpt-test");
+
+    expect(queryMock.mock.calls[1][1]).toEqual([
+      "workspace-1", "repo-1", "prompt-1", "Fix the auth flow", "codex", "gpt-test", promptText, "abc123",
     ]);
   });
 

@@ -12,6 +12,7 @@ import {
 } from "@mui/x-data-grid";
 import Link from "./link";
 import { compact, date, duration, money } from "../lib/format";
+import { promptTitle } from "../lib/prompt-presentation";
 import type { FileHotspot, MatchedModelComparison, ToolHealth } from "@tokenlens/shared";
 
 const gridSx = {
@@ -189,6 +190,7 @@ export type PromptTableRow = {
 };
 
 const promptSortFields: Record<string, string> = {
+  date: "startedAt",
   context: "context",
   cost: "cost",
   files: "files",
@@ -198,7 +200,7 @@ const promptSortFields: Record<string, string> = {
 
 export function PromptsDataTable({
   rows,
-  initialSort = "context",
+  initialSort = "date",
 }: {
   rows: PromptTableRow[];
   initialSort?: string;
@@ -241,7 +243,7 @@ export function PromptsDataTable({
       rows={rows}
       columns={columns}
       initialState={{
-        sorting: { sortModel: [{ field: promptSortFields[initialSort] ?? "context", sort: "desc" }] },
+        sorting: { sortModel: [{ field: promptSortFields[initialSort] ?? "startedAt", sort: "desc" }] },
       }}
       showToolbar={false}
     />
@@ -294,7 +296,7 @@ export function ToolHealthDataTable({ rows, initialTool }: { rows: ToolHealth[];
 
 export function ModelComparisonsDataTable({ rows }: { rows: MatchedModelComparison[] }) {
   const columns: GridColDef<MatchedModelComparison>[] = [
-    { field: "promptText", headerName: "Matched prompt", minWidth: 300, flex: 1, valueFormatter: (value) => String(value).replace(/\s+/g, " ").slice(0, 100) },
+    { field: "promptText", headerName: "Matched prompt", minWidth: 300, flex: 1, valueFormatter: (value) => promptTitle(String(value), 100) },
     { field: "provider", headerName: "Provider", minWidth: 110 },
     { field: "model", headerName: "Model", minWidth: 180 },
     { field: "runs", headerName: "Runs", type: "number", minWidth: 85 },
