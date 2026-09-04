@@ -2,54 +2,58 @@
 
 import { useState } from "react";
 import type { FormEvent } from "react";
-import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
-import Chip from "@mui/material/Chip";
+import Dialog from "@mui/material/Dialog";
+import DialogActions from "@mui/material/DialogActions";
+import DialogContent from "@mui/material/DialogContent";
+import DialogTitle from "@mui/material/DialogTitle";
+import Divider from "@mui/material/Divider";
 import MenuItem from "@mui/material/MenuItem";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
-import { EmptyState } from "../../components/ui";
-import { formatLocalTimestamp } from "../../lib/date-time";
-
-type Member = {
-  id: string;
-  name: string | null;
-  email: string;
-  role: "owner" | "member";
-  created_at: string;
-};
-
-type Invitation = {
-  id: string;
-  email: string;
-  role: "owner" | "member";
-  created_at: string;
-  expires_at: string;
-  status: "invited" | "expired";
-};
+import { WorkspaceAccessDataTable } from "../../components/data-tables";
+import {
+  workspaceAccessTableRows,
+  type WorkspaceInvitation as Invitation,
+  type WorkspaceMember as Member,
+} from "../../components/workspace-access-data";
+import { Panel } from "../../components/ui";
+import { useToast } from "../../components/toast-provider";
 
 type MembersData = {
   members: Member[];
   invitations: Invitation[];
 };
 
-type Notice = {
-  severity: "success" | "error" | "info";
-  text: string;
+type RemovalTarget = {
+  type: "member" | "invitation";
+  id: string;
+  label: string;
 };
 
-export default function MembersClient({ initial }: { initial: MembersData }) {
+type EditTarget = RemovalTarget & {
+  role: "owner" | "member";
+};
+
+export default function MembersClient({ initial, currentUserId }: { initial: MembersData; currentUserId: string }) {
+  const showToast = useToast();
+  const [members, setMembers] = useState(initial.members);
   const [invitations, setInvitations] = useState(initial.invitations);
-  const [notice, setNotice] = useState<Notice | null>(null);
   const [inviting, setInviting] = useState(false);
+  const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
+  const [editRole, setEditRole] = useState<"owner" | "member">("member");
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [removalTarget, setRemovalTarget] = useState<RemovalTarget | null>(null);
+  const [removing, setRemoving] = useState(false);
+  const managingAccess = savingEdit || removing;
+  const accessRows = workspaceAccessTableRows(members, invitations, currentUserId);
 
   async function invite(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
     setInviting(true);
-    setNotice(null);
 
     try {
       const response = await fetch("/api/workspace/invitations", {
@@ -59,7 +63,7 @@ export default function MembersClient({ initial }: { initial: MembersData }) {
       });
       const result = await response.json();
       if (!response.ok) {
-        setNotice({ severity: "error", text: result.error ?? "Could not create the invitation." });
+        showToast(result.error ?? "Could not create the invitation.", "error");
         return;
       }
 
@@ -69,70 +73,120 @@ export default function MembersClient({ initial }: { initial: MembersData }) {
         ...current.filter((item) => item.email.toLowerCase() !== invitation.email.toLowerCase()),
       ]);
       formElement.reset();
-      setNotice({
-        severity: result.emailSent ? "success" : "info",
-        text: result.emailSent
+      showToast(
+        result.emailSent
           ? `Invitation sent to ${invitation.email}.`
-          : `Invitation created for ${invitation.email}; configure EMAIL_SERVER to send email.`,
-      });
+          : `Invitation created for ${invitation.email}; configure AUTH_RESEND_KEY to send email.`,
+        result.emailSent ? "success" : "info",
+      );
     } catch {
-      setNotice({ severity: "error", text: "Could not create the invitation." });
+      showToast("Could not create the invitation.", "error");
     } finally {
       setInviting(false);
     }
   }
 
-  return <Box sx={{ display: "grid", gap: 4 }}>
-    {notice ? <Alert severity={notice.severity} onClose={() => setNotice(null)}>{notice.text}</Alert> : null}
+  function openEdit(target: EditTarget) {
+    setEditTarget(target);
+    setEditRole(target.role);
+  }
 
+  async function saveRole() {
+    if (!editTarget) return;
+    const target = editTarget;
+    if (editRole === target.role) {
+      setEditTarget(null);
+      return;
+    }
+    setSavingEdit(true);
+    try {
+      const response = await fetch(target.type === "member" ? "/api/workspace/members" : "/api/workspace/invitations", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: target.id, role: editRole }),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        showToast(result.error ?? `Could not change the ${target.type}'s role.`, "error");
+        return;
+      }
+      if (target.type === "member") {
+        setMembers((current) => current.map((item) => item.id === target.id ? { ...item, role: result.role } : item));
+      } else {
+        setInvitations((current) => current.map((item) => item.id === target.id ? result : item));
+      }
+      setEditTarget(null);
+      showToast(
+        target.type === "member"
+          ? `${target.label} is now ${editRole === "owner" ? "an owner" : "a member"}.`
+          : `${target.label} will join as ${editRole === "owner" ? "an owner" : "a member"}.`,
+        "success",
+      );
+    } catch {
+      showToast(`Could not change the ${target.type}'s role.`, "error");
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
+  async function removeAccess() {
+    if (!removalTarget) return;
+    const target = removalTarget;
+    setRemoving(true);
+    try {
+      const response = await fetch(target.type === "member" ? "/api/workspace/members" : "/api/workspace/invitations", {
+        method: "DELETE",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: target.id }),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        showToast(result.error ?? `Could not remove the ${target.type}.`, "error");
+        return;
+      }
+      if (target.type === "member") {
+        setMembers((current) => current.filter((member) => member.id !== target.id));
+      } else {
+        setInvitations((current) => current.filter((invitation) => invitation.id !== target.id));
+      }
+      setRemovalTarget(null);
+      showToast(
+        target.type === "member"
+          ? `${target.label} was removed from the workspace.`
+          : `The invitation for ${target.label} was cancelled.`,
+        "success",
+      );
+    } catch {
+      showToast(`Could not remove the ${target.type}.`, "error");
+    } finally {
+      setRemoving(false);
+    }
+  }
+
+  return <Box sx={{ display: "grid", gap: 4 }}>
     <Box>
       <Typography variant="h5">Workspace access</Typography>
-      <Typography color="text.secondary" sx={{ mt: .75, mb: 2 }}>
+      <Typography color="text.secondary" sx={{ mt: .75 }}>
         Active members and people who have been invited to join this workspace.
       </Typography>
-      <Box sx={{ borderTop: 1, borderColor: "divider" }}>
-        {initial.members.map((member) => <Box
-          key={`member-${member.id}`}
-          sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2, py: 2, borderBottom: 1, borderColor: "divider", flexWrap: "wrap" }}
-        >
-          <Box sx={{ minWidth: 0 }}>
-            <Typography sx={{ fontWeight: 800 }}>{member.name || member.email}</Typography>
-            {member.name ? <Typography color="text.secondary" sx={{ fontSize: 13 }}>{member.email}</Typography> : null}
-            <Typography color="text.secondary" sx={{ mt: .5, fontSize: 13 }}>
-              Joined {formatLocalTimestamp(member.created_at, "date")}
-            </Typography>
-          </Box>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <Chip size="small" label={member.role === "owner" ? "Owner" : "Member"} variant="outlined" />
-            <Chip size="small" label="Active" color="info" />
-          </Box>
-        </Box>)}
-
-        {invitations.map((invitation) => <Box
-          key={`invitation-${invitation.id}`}
-          sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2, py: 2, borderBottom: 1, borderColor: "divider", flexWrap: "wrap" }}
-        >
-          <Box sx={{ minWidth: 0 }}>
-            <Typography sx={{ fontWeight: 800 }}>{invitation.email}</Typography>
-            <Typography color="text.secondary" sx={{ mt: .5, fontSize: 13 }}>
-              Invited {formatLocalTimestamp(invitation.created_at, "date")} · {invitation.status === "expired" ? "Expired" : "Expires"} {formatLocalTimestamp(invitation.expires_at, "date")}
-            </Typography>
-          </Box>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <Chip size="small" label={invitation.role === "owner" ? "Owner" : "Member"} variant="outlined" />
-            <Chip
-              size="small"
-              label={invitation.status === "expired" ? "Expired" : "Invited"}
-              color={invitation.status === "expired" ? "default" : "warning"}
-              variant={invitation.status === "expired" ? "outlined" : "filled"}
-            />
-          </Box>
-        </Box>)}
-      </Box>
-      {!invitations.length ? <EmptyState>No outstanding invitations.</EmptyState> : null}
+      <WorkspaceAccessDataTable
+        rows={accessRows}
+        disabled={managingAccess}
+        onEdit={(row) => openEdit({
+          type: row.type,
+          id: row.entityId,
+          label: row.displayName,
+          role: row.role,
+        })}
+        onDelete={(row) => setRemovalTarget({
+          type: row.type,
+          id: row.entityId,
+          label: row.displayName,
+        })}
+      />
     </Box>
 
-    <Box>
+    <Panel>
       <Typography variant="h5" sx={{ mb: 2 }}>Invite a member</Typography>
       <Box component="form" onSubmit={invite} sx={{ display: "flex", gap: 1, flexWrap: "wrap", alignItems: "flex-start" }}>
         <TextField name="email" type="email" label="Email" size="small" required disabled={inviting} />
@@ -142,6 +196,54 @@ export default function MembersClient({ initial }: { initial: MembersData }) {
         </TextField>
         <Button type="submit" variant="outlined" disabled={inviting}>{inviting ? "Inviting…" : "Invite"}</Button>
       </Box>
-    </Box>
+    </Panel>
+
+    <Dialog open={Boolean(editTarget)} onClose={savingEdit ? undefined : () => setEditTarget(null)} fullWidth maxWidth="xs">
+      <DialogTitle>Edit {editTarget?.type === "invitation" ? "invitation" : "member"}</DialogTitle>
+      <DialogContent>
+        <Typography sx={{ mb: 2 }}>
+          Change the workspace role for {editTarget?.label}.
+        </Typography>
+        <TextField
+          autoFocus
+          select
+          fullWidth
+          label="Role"
+          value={editRole}
+          disabled={savingEdit}
+          onChange={(event) => setEditRole(event.target.value as "owner" | "member")}
+        >
+          <MenuItem value="member">Member</MenuItem>
+          <MenuItem value="owner">Owner</MenuItem>
+        </TextField>
+      </DialogContent>
+      <Divider />
+      <DialogActions>
+        <Button onClick={() => setEditTarget(null)} disabled={savingEdit}>Cancel</Button>
+        <Button variant="contained" onClick={saveRole} disabled={savingEdit || editRole === editTarget?.role}>
+          {savingEdit ? "Saving…" : "Save changes"}
+        </Button>
+      </DialogActions>
+    </Dialog>
+
+    <Dialog open={Boolean(removalTarget)} onClose={removing ? undefined : () => setRemovalTarget(null)}>
+      <DialogTitle>
+        {removalTarget?.type === "invitation" ? "Cancel invitation" : "Remove member"} for {removalTarget?.label}?
+      </DialogTitle>
+      <DialogContent>
+        <Typography>
+          {removalTarget?.type === "invitation"
+            ? "This person will no longer be able to use this invitation to join the workspace."
+            : "This person will immediately lose access to this workspace. Their TokenLens account will not be deleted."}
+        </Typography>
+      </DialogContent>
+      <Divider />
+      <DialogActions>
+        <Button onClick={() => setRemovalTarget(null)} disabled={removing}>Cancel</Button>
+        <Button color="error" variant="contained" onClick={removeAccess} disabled={removing}>
+          {removing ? "Removing…" : removalTarget?.type === "invitation" ? "Cancel invitation" : "Remove member"}
+        </Button>
+      </DialogActions>
+    </Dialog>
   </Box>;
 }

@@ -18,6 +18,25 @@ const providerWhere = (provider: string | undefined, parameters: Parameters, ali
 
 const escapeLikePattern = (value: string) => value.replace(/[\\%_]/g, "\\$&");
 
+async function scopedDevelopers(workspaceId: string, model?: string, provider?: string) {
+  const parameters = new Parameters();
+  const workspace = parameters.add(workspaceId);
+  const modelWhere = model ? `and model=${parameters.add(model)}` : "";
+  const selectedModel = parameters.add(model ?? null);
+  return rows(`select d.id,d.provider,d.email,count(distinct p.id)::int prompts,
+      coalesce(jsonb_agg(distinct jsonb_build_object('id',r.id,'name',r.name))
+        filter(where r.id is not null),'[]'::jsonb) repositories,
+      min(p.started_at) first_observed_at,max(p.started_at) last_observed_at
+    from developers d join prompts p on p.developer_id=d.id
+    left join repositories r on r.id=p.repository_id and r.workspace_id=${workspace}::uuid
+    left join lateral(select max(model) model from api_requests
+      where prompt_id=p.id ${modelWhere})a on true
+    where d.workspace_id=${workspace}::uuid and p.workspace_id=${workspace}::uuid
+      and (${selectedModel}::text is null or a.model=${selectedModel} or (a.model is null and p.model=${selectedModel}))
+      ${providerWhere(provider, parameters)}
+    group by d.id order by last_observed_at desc nulls last,d.id`, parameters);
+}
+
 export async function overview(model?: string, provider?: string) {
   const { workspaceId } = await requireWorkspace();
   const summaryParameters = new Parameters();
@@ -57,6 +76,8 @@ export async function overview(model?: string, provider?: string) {
     where r.workspace_id=${repositoryWorkspace}::uuid
     order by median_context desc`, repositoryParameters);
 
+  const developers = await scopedDevelopers(workspaceId, model, provider);
+
   const modelParameters = new Parameters();
   const modelWorkspace = modelParameters.add(workspaceId);
   const models = await rows(`select a.model,count(distinct a.prompt_id)::int count
@@ -66,7 +87,7 @@ export async function overview(model?: string, provider?: string) {
   const providerParameters = new Parameters();
   const providerWorkspace = providerParameters.add(workspaceId);
   const providers = await rows(`select provider,count(*)::int count from prompts where workspace_id=${providerWorkspace}::uuid group by provider order by count desc`, providerParameters);
-  return { summary, repositories, models, providers };
+  return { summary, repositories, developers, models, providers };
 }
 
 export async function repository(id: string, model?: string, provider?: string) {
@@ -385,9 +406,7 @@ export async function archiveBenchmark(id: string) {
     where id=${parameters.add(id)}::uuid and workspace_id=${parameters.add(workspaceId)}::uuid and archived_at is null returning id,repository_id`, parameters))[0] ?? null;
 }
 
-export async function developersList() {
+export async function developersList(model?: string, provider?: string) {
   const { workspaceId } = await requireWorkspace();
-  const parameters = new Parameters();
-  return rows(`select d.*,count(p.id)::int prompts from developers d left join prompts p on p.developer_id=d.id
-    where d.workspace_id=${parameters.add(workspaceId)}::uuid group by d.id order by d.last_seen_at desc`, parameters);
+  return scopedDevelopers(workspaceId, model, provider);
 }

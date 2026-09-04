@@ -35,8 +35,7 @@ pnpm dev
 ```
 
 Open the dashboard at <http://localhost:3000>. The ingestion API runs at
-<http://localhost:3001>. Sign-in emails are captured locally at
-<http://localhost:8025>. The default development ingest key is
+<http://localhost:3001>. The default development ingest key is
 `development-key-change-me`; replace it outside local development.
 
 ## Authentication and workspaces
@@ -48,9 +47,11 @@ account receives a workspace and owner membership; verified
 invite other users and create, rotate, or revoke write-only ingestion keys from
 the API Keys page.
 
-Set a long random `AUTH_SECRET` in every environment. Configure `EMAIL_SERVER`
-and `EMAIL_FROM` for production mail delivery. Local development uses Mailpit
-from Docker Compose.
+Set a long random `AUTH_SECRET` in every environment. Email delivery uses
+Resend for both magic links and workspace invitations. Set `AUTH_RESEND_KEY` to
+a Resend API key and set `EMAIL_FROM` to an address on a verified Resend domain.
+The `onboarding@resend.dev` sender in `.env.example` can only send test messages
+to the email address associated with the Resend account.
 
 ## Agent setup
 

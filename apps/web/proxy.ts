@@ -3,7 +3,8 @@ import { auth } from "./auth";
 
 export const proxy = auth((request) => {
   const path = request.nextUrl.pathname;
-  const publicRoute = path.startsWith("/login") || path.startsWith("/api/auth");
+  const publicRoute =
+    path === "/" || path.startsWith("/login") || path.startsWith("/api/auth");
   if (publicRoute || request.auth) return NextResponse.next();
   if (path.startsWith("/api/")) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });

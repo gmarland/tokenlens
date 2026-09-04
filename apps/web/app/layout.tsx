@@ -1,5 +1,6 @@
 import AppBar from "@mui/material/AppBar";
 import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
 import CssBaseline from "@mui/material/CssBaseline";
 import MuiLink from "@mui/material/Link";
 import Toolbar from "@mui/material/Toolbar";
@@ -8,6 +9,7 @@ import { ThemeProvider } from "@mui/material/styles";
 import { AppRouterCacheProvider } from "@mui/material-nextjs/v16-appRouter";
 import Link from "../components/link";
 import AccountMenu from "../components/account-menu";
+import { ToastProvider } from "../components/toast-provider";
 import theme from "./theme";
 import { auth, signOut } from "../auth";
 
@@ -46,7 +48,7 @@ export default async function Layout({ children }: { children: React.ReactNode }
               >
                 <MuiLink
                   component={Link}
-                  href="/"
+                  href={session?.user ? "/dashboard" : "/"}
                   color="inherit"
                   underline="none"
                 >
@@ -82,28 +84,28 @@ export default async function Layout({ children }: { children: React.ReactNode }
                     justifySelf: "end",
                   }}
                 >
-                  <MuiLink
-                    component={Link}
-                    href="/"
-                    color="inherit"
-                    underline="hover"
-                    sx={{ display: { xs: "none", sm: "inline" }, fontSize: 13, fontWeight: 800 }}
-                  >
-                    Repositories
-                  </MuiLink>
-                  {workspaceRole === "owner" ? (
-                    <MuiLink
-                      component={Link}
-                      href="/members"
-                      color="inherit"
-                      underline="hover"
-                      sx={{ display: { xs: "none", sm: "inline" }, fontSize: 13, fontWeight: 800 }}
-                    >
-                      Members
-                    </MuiLink>
-                  ) : null}
                   {session?.user ? (
                     <>
+                      <MuiLink
+                        component={Link}
+                        href="/dashboard"
+                        color="inherit"
+                        underline="hover"
+                        sx={{ display: { xs: "none", sm: "inline" }, fontSize: 13, fontWeight: 800 }}
+                      >
+                        Repositories
+                      </MuiLink>
+                      {workspaceRole === "owner" ? (
+                        <MuiLink
+                          component={Link}
+                          href="/members"
+                          color="inherit"
+                          underline="hover"
+                          sx={{ display: { xs: "none", sm: "inline" }, fontSize: 13, fontWeight: 800 }}
+                        >
+                          Members
+                        </MuiLink>
+                      ) : null}
                       {workspaceRole === "owner" ? (
                         <MuiLink component={Link} href="/api-keys" color="inherit" underline="hover" sx={{ fontSize: 13, fontWeight: 800 }}>
                           API Keys
@@ -111,11 +113,29 @@ export default async function Layout({ children }: { children: React.ReactNode }
                       ) : null}
                       <AccountMenu signOutAction={async () => { "use server"; await signOut({ redirectTo: "/login" }); }} />
                     </>
-                  ) : null}
+                  ) : (
+                    <>
+                      <MuiLink component="a" href="/#product" color="inherit" underline="hover" sx={{ display: { xs: "none", md: "inline" }, fontSize: 13, fontWeight: 800 }}>
+                        Product
+                      </MuiLink>
+                      <MuiLink component="a" href="/#how" color="inherit" underline="hover" sx={{ display: { xs: "none", md: "inline" }, fontSize: 13, fontWeight: 800 }}>
+                        How it works
+                      </MuiLink>
+                      <MuiLink component="a" href="/#privacy" color="inherit" underline="hover" sx={{ display: { xs: "none", md: "inline" }, fontSize: 13, fontWeight: 800 }}>
+                        Privacy
+                      </MuiLink>
+                      <MuiLink component={Link} href="/login" color="inherit" underline="hover" sx={{ display: { xs: "none", sm: "inline" }, fontSize: 13, fontWeight: 800 }}>
+                        Sign in
+                      </MuiLink>
+                      <Button component={Link} href="/login" variant="contained" size="small">
+                        Start measuring
+                      </Button>
+                    </>
+                  )}
                 </Box>
               </Toolbar>
             </AppBar>
-            {children}
+            <ToastProvider>{children}</ToastProvider>
           </ThemeProvider>
         </AppRouterCacheProvider>
       </body>

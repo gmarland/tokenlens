@@ -2,8 +2,12 @@
 
 import Box from "@mui/material/Box";
 import Chip from "@mui/material/Chip";
+import IconButton from "@mui/material/IconButton";
 import MuiLink from "@mui/material/Link";
 import Paper from "@mui/material/Paper";
+import SvgIcon from "@mui/material/SvgIcon";
+import Tooltip from "@mui/material/Tooltip";
+import Typography from "@mui/material/Typography";
 import {
   DataGrid,
   type GridColDef,
@@ -12,8 +16,10 @@ import {
 } from "@mui/x-data-grid";
 import Link from "./link";
 import { compact, date, duration, money } from "../lib/format";
+import { formatLocalTimestamp } from "../lib/date-time";
 import { promptTitle } from "../lib/prompt-presentation";
 import type { FileHotspot, MatchedModelComparison, ToolHealth } from "@tokenlens/shared";
+import type { WorkspaceAccessTableRow } from "./workspace-access-data";
 
 const gridSx = {
   border: 0,
@@ -58,6 +64,7 @@ function TableGrid({
   initialState,
   initialQuickFilter,
   showToolbar = true,
+  enableCsvExport = true,
 }: {
   label: string;
   rows: GridRowsProp;
@@ -65,6 +72,7 @@ function TableGrid({
   initialState?: GridInitialState;
   initialQuickFilter?: string;
   showToolbar?: boolean;
+  enableCsvExport?: boolean;
 }) {
   return (
     <Paper
@@ -87,7 +95,10 @@ function TableGrid({
         showToolbar={showToolbar}
         slotProps={{
           toolbar: {
-            csvOptions: { fileName: label.toLowerCase().replaceAll(" ", "-") },
+            csvOptions: {
+              fileName: label.toLowerCase().replaceAll(" ", "-"),
+              disableToolbarButton: !enableCsvExport,
+            },
             printOptions: { disableToolbarButton: true },
             quickFilterProps: { debounceMs: 250 },
           },
@@ -96,6 +107,123 @@ function TableGrid({
       />
     </Paper>
   );
+}
+
+function EditIcon() {
+  return <SvgIcon fontSize="small" viewBox="0 0 24 24">
+    <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zm17.71-10.04a1 1 0 0 0 0-1.42l-2.5-2.5a1 1 0 0 0-1.42 0l-1.96 1.96 3.75 3.75 2.13-1.79z" />
+  </SvgIcon>;
+}
+
+function DeleteIcon() {
+  return <SvgIcon fontSize="small" viewBox="0 0 24 24">
+    <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zm3-9h2v8H9v-8zm4 0h2v8h-2v-8zm2.5-6-1-1h-5l-1 1H5v2h14V4h-3.5z" />
+  </SvgIcon>;
+}
+
+export function WorkspaceAccessDataTable({
+  rows,
+  disabled,
+  onEdit,
+  onDelete,
+}: {
+  rows: WorkspaceAccessTableRow[];
+  disabled: boolean;
+  onEdit: (row: WorkspaceAccessTableRow) => void;
+  onDelete: (row: WorkspaceAccessTableRow) => void;
+}) {
+  const columns: GridColDef<WorkspaceAccessTableRow>[] = [
+    {
+      field: "displayName",
+      headerName: "User",
+      minWidth: 240,
+      flex: 1,
+      valueGetter: (_value, row) => row.displayName === row.email
+        ? row.displayName
+        : `${row.displayName} ${row.email}`,
+      renderCell: ({ row }) => <Box sx={{ minWidth: 0, py: 1 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <Typography noWrap sx={{ fontWeight: 750 }}>{row.displayName}</Typography>
+          {row.isCurrentUser ? <Chip size="small" label="You" color="secondary" /> : null}
+        </Box>
+        {row.displayName !== row.email ? <Typography noWrap color="text.secondary" sx={{ fontSize: 12 }}>{row.email}</Typography> : null}
+      </Box>,
+    },
+    {
+      field: "role",
+      headerName: "Role",
+      minWidth: 105,
+      renderCell: ({ value }) => <Chip size="small" label={value === "owner" ? "Owner" : "Member"} variant="outlined" />,
+    },
+    {
+      field: "status",
+      headerName: "Status",
+      minWidth: 105,
+      renderCell: ({ value }) => <Chip
+        size="small"
+        label={value === "active" ? "Active" : value === "invited" ? "Invited" : "Expired"}
+        color={value === "active" ? "info" : value === "invited" ? "warning" : "default"}
+        variant={value === "expired" ? "outlined" : "filled"}
+      />,
+    },
+    {
+      field: "createdAt",
+      headerName: "Joined / invited",
+      type: "date",
+      minWidth: 150,
+      valueGetter: (value) => value ? new Date(value) : null,
+      valueFormatter: (value) => value ? formatLocalTimestamp(value, "date") : "—",
+    },
+    {
+      field: "expiresAt",
+      headerName: "Expires",
+      type: "date",
+      minWidth: 125,
+      valueGetter: (value) => value ? new Date(value) : null,
+      valueFormatter: (value) => value ? formatLocalTimestamp(value, "date") : "—",
+    },
+    {
+      field: "actions",
+      headerName: "Actions",
+      minWidth: 105,
+      sortable: false,
+      filterable: false,
+      disableColumnMenu: true,
+      renderCell: ({ row }) => <Box sx={{ display: "flex", alignItems: "center", gap: .75 }}>
+        <Tooltip title={row.isCurrentUser ? "You cannot edit your own workspace role" : `Edit ${row.displayName}`}>
+          <span>
+            <IconButton
+              aria-label={`Edit ${row.displayName}`}
+              size="small"
+              disabled={row.isCurrentUser || disabled}
+              onClick={() => onEdit(row)}
+              sx={{ border: 1, borderRadius: 0 }}
+            ><EditIcon /></IconButton>
+          </span>
+        </Tooltip>
+        <Tooltip title={row.isCurrentUser ? "You cannot remove yourself" : row.type === "invitation" ? `Cancel invitation for ${row.email}` : `Remove ${row.displayName}`}>
+          <span>
+            <IconButton
+              aria-label={row.type === "invitation" ? `Cancel invitation for ${row.email}` : `Remove ${row.displayName}`}
+              color="error"
+              size="small"
+              disabled={row.isCurrentUser || disabled}
+              onClick={() => onDelete(row)}
+              sx={{ border: 1, borderRadius: 0 }}
+            ><DeleteIcon /></IconButton>
+          </span>
+        </Tooltip>
+      </Box>,
+    },
+  ];
+
+  return <TableGrid
+    label="Workspace access"
+    rows={rows}
+    columns={columns}
+    showToolbar={false}
+    enableCsvExport={false}
+  />;
 }
 
 export type RepositoryTableRow = {
@@ -141,6 +269,81 @@ export function RepositoriesDataTable({
   ];
 
   return <TableGrid label="Repositories" rows={rows} columns={columns} showToolbar={false} />;
+}
+
+export type DeveloperTableRow = {
+  id: string;
+  developer: string;
+  provider: string;
+  repositories: { id: string; name: string }[];
+  prompts: number;
+  firstObservedAt: string | null;
+  lastObservedAt: string | null;
+};
+
+export function DevelopersDataTable({
+  rows,
+  queryString = "",
+  showRepositories = true,
+}: {
+  rows: DeveloperTableRow[];
+  queryString?: string;
+  showRepositories?: boolean;
+}) {
+  const columns: GridColDef<DeveloperTableRow>[] = [
+    { field: "developer", headerName: "Developer", minWidth: 240, flex: 1 },
+    ...(showRepositories ? [{
+      field: "repositories",
+      headerName: "Repositories",
+      minWidth: 240,
+      flex: 1,
+      valueGetter: (_value, row) => row.repositories.map((repository) => repository.name).join(", "),
+      renderCell: ({ row }) => row.repositories.length ? (
+        <Box sx={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {row.repositories.map((repository, index) => (
+            <Box component="span" key={repository.id} sx={{ whiteSpace: "nowrap" }}>
+              {index ? ", " : null}
+              <MuiLink
+                component={Link}
+                href={`/repos/${repository.id}${queryString}`}
+                color="inherit"
+                underline="hover"
+                sx={{ fontWeight: 650 }}
+              >
+                {repository.name}
+              </MuiLink>
+            </Box>
+          ))}
+        </Box>
+      ) : "Unattributed",
+    } satisfies GridColDef<DeveloperTableRow>] : []),
+    { field: "provider", headerName: "Provider", minWidth: 130, renderCell: ({ value }) => <Chip size="small" label={value} /> },
+    { field: "prompts", headerName: "Prompts", type: "number", minWidth: 105 },
+    {
+      field: "firstObservedAt",
+      headerName: "First observed",
+      type: "dateTime",
+      minWidth: 175,
+      valueGetter: (value) => value ? new Date(value) : null,
+      valueFormatter: date,
+    },
+    {
+      field: "lastObservedAt",
+      headerName: "Last observed",
+      type: "dateTime",
+      minWidth: 175,
+      valueGetter: (value) => value ? new Date(value) : null,
+      valueFormatter: date,
+    },
+  ];
+
+  return <TableGrid
+    label="Developers"
+    rows={rows}
+    columns={columns}
+    initialState={{ sorting: { sortModel: [{ field: "lastObservedAt", sort: "desc" }] } }}
+    showToolbar={false}
+  />;
 }
 
 export type FileReadTableRow = {

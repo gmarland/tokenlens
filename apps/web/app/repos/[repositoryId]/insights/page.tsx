@@ -25,7 +25,7 @@ export default async function RepositoryInsights({ params, searchParams }: PageP
   if (model) filterQuery.set("model", model);
   if (range) filterQuery.set("range", range);
   return <Page>
-    <BackLink href="/">← All repositories</BackLink>
+    <BackLink href="/dashboard">← All repositories</BackLink>
     <Eyebrow sx={{ mt: 3 }}>Recommended actions</Eyebrow>
     <Typography variant="h1">{repo.repo.name}</Typography>
     <Intro>Evidence-backed opportunities for {provider ?? "all providers"} · {model ?? "all models"}. Recommendations are experiments, not causal claims.</Intro>

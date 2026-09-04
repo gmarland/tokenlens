@@ -2,6 +2,14 @@ import { describe, expect, it } from "vitest";
 import { formatLocalTimestamp } from "./date-time";
 
 describe("formatLocalTimestamp", () => {
+  it("uses the same explicit locale during server rendering and hydration", () => {
+    expect(formatLocalTimestamp(
+      "2026-09-02T10:00:00Z",
+      "date",
+      "UTC",
+    )).toBe("2 Sept 26");
+  });
+
   it("renders offset-bearing timestamps as the same instant in the requested local zone", () => {
     const rendered = formatLocalTimestamp(
       "2026-08-31T23:31:39+02:00",

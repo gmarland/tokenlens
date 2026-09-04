@@ -29,5 +29,5 @@ export function formatLocalTimestamp(
           timeZoneName: "short",
         };
 
-  return new Intl.DateTimeFormat(undefined, { ...options, timeZone }).format(date);
+  return new Intl.DateTimeFormat("en-GB", { ...options, timeZone }).format(date);
 }

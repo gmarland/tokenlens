@@ -14,10 +14,45 @@ import {
   BenchmarkValidationError,
   benchmarkDetail,
   createPromptBenchmark,
+  overview,
   repository,
   repositoryBenchmarks,
   repositoryPrompts,
 } from "./data";
+
+describe("overview developer cohort", () => {
+  beforeEach(() => {
+    dbMock.mockReset();
+    queryMock.mockReset();
+    dbMock.mockResolvedValue({ query: queryMock });
+  });
+
+  it("returns only developers with prompts in the active provider and model scope", async () => {
+    queryMock
+      .mockResolvedValueOnce([{ repositories: 1, developers: 1, prompts: 2, context_tokens: "1200" }])
+      .mockResolvedValueOnce([{ id: "repo-1", name: "tokenlens" }])
+      .mockResolvedValueOnce([{
+        id: "developer-1",
+        provider: "codex",
+        email: "dev@example.com",
+        repositories: [{ id: "repo-1", name: "tokenlens" }],
+        prompts: 2,
+        first_observed_at: new Date("2026-09-01T10:00:00.000Z"),
+        last_observed_at: new Date("2026-09-02T10:00:00.000Z"),
+      }])
+      .mockResolvedValueOnce([{ model: "gpt-test", count: 2 }])
+      .mockResolvedValueOnce([{ provider: "codex", count: 2 }]);
+
+    const result = await overview("gpt-test", "codex");
+
+    expect(result.developers).toHaveLength(1);
+    expect(result.developers[0]).toMatchObject({ id: "developer-1", prompts: 2 });
+    expect(queryMock.mock.calls[2][0]).toContain("from developers d join prompts p on p.developer_id=d.id");
+    expect(queryMock.mock.calls[2][0]).toContain("jsonb_agg(distinct jsonb_build_object('id',r.id,'name',r.name))");
+    expect(queryMock.mock.calls[2][0]).toContain("count(distinct p.id)::int prompts");
+    expect(queryMock.mock.calls[2][1]).toEqual(["workspace-1", "gpt-test", "gpt-test", "codex"]);
+  });
+});
 
 describe("repository structure history", () => {
   beforeEach(() => {

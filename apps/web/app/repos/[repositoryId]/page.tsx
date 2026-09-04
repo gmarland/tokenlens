@@ -3,11 +3,13 @@ import Typography from "@mui/material/Typography";
 import { median } from "@tokenlens/analytics";
 import { notFound } from "next/navigation";
 import { AnalysisFilters } from "../../../components/filters";
+import { DevelopersDataTable, type DeveloperTableRow } from "../../../components/data-tables";
 import { InsightCards } from "../../../components/insight-cards";
 import { ContextComposition } from "../../../components/context-composition";
 import { RepositoryNav } from "../../../components/repository-nav";
 import {
   Cards,
+  EmptyState,
   Eyebrow,
   Intro,
   MetricCard,
@@ -33,6 +35,39 @@ export default async function Repo({ params, searchParams }: any) {
   const s = data.repo.snapshot ?? {};
   const latestStructure = data.snapshots.at(-1);
   const nums = (k: string) => rs.map((x: any) => Number(x[k] ?? 0));
+  const developersById = new Map<string, DeveloperTableRow>();
+  for (const prompt of rs) {
+    if (!prompt.developer_id) continue;
+    const developerId = String(prompt.developer_id);
+    const observedAt = prompt.started_at
+      ? new Date(prompt.started_at).toISOString()
+      : null;
+    const existing = developersById.get(developerId);
+    if (existing) {
+      existing.prompts += 1;
+      if (observedAt && (!existing.firstObservedAt || observedAt < existing.firstObservedAt)) {
+        existing.firstObservedAt = observedAt;
+      }
+      if (observedAt && (!existing.lastObservedAt || observedAt > existing.lastObservedAt)) {
+        existing.lastObservedAt = observedAt;
+      }
+      continue;
+    }
+    developersById.set(developerId, {
+      id: developerId,
+      developer: prompt.email
+        ? String(prompt.email)
+        : `Identity ${developerId.slice(0, 8)}`,
+      provider: String(prompt.provider),
+      repositories: [{ id, name: String(data.repo.name) }],
+      prompts: 1,
+      firstObservedAt: observedAt,
+      lastObservedAt: observedAt,
+    });
+  }
+  const developers = [...developersById.values()].sort((a, b) =>
+    (b.lastObservedAt ?? "").localeCompare(a.lastObservedAt ?? "") ||
+    a.developer.localeCompare(b.developer));
 
   return (
     <Page>
@@ -97,6 +132,14 @@ export default async function Repo({ params, searchParams }: any) {
           )}
         />
       </Cards>
+      <SectionTitle>Developers</SectionTitle>
+      {developers.length ? (
+        <DevelopersDataTable rows={developers} showRepositories={false} />
+      ) : (
+        <Panel sx={{ p: 0 }}>
+          <EmptyState>No identified developers match the current analysis filters.</EmptyState>
+        </Panel>
+      )}
       <SectionTitle>Recommended actions</SectionTitle>
       <Panel><InsightCards insights={insightBundle.insights.filter((insight) => !["dismissed", "resolved"].includes(insight.state ?? "new")).slice(0, 3)} /></Panel>
       <SectionTitle>Context composition</SectionTitle>

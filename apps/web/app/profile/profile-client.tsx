@@ -3,37 +3,31 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import { Panel } from "../../components/ui";
+import { useToast } from "../../components/toast-provider";
 
 type Profile = {
   name: string;
   email: string;
 };
 
-type Notice = {
-  severity: "success" | "error";
-  text: string;
-};
-
 export default function ProfileClient({ initial }: { initial: Profile }) {
   const router = useRouter();
+  const showToast = useToast();
   const [saved, setSaved] = useState(initial);
   const [name, setName] = useState(initial.name);
   const [email, setEmail] = useState(initial.email);
   const [saving, setSaving] = useState(false);
-  const [notice, setNotice] = useState<Notice | null>(null);
   const normalized = { name: name.trim(), email: email.trim().toLowerCase() };
   const dirty = normalized.name !== saved.name || normalized.email !== saved.email;
 
   async function saveProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true);
-    setNotice(null);
     try {
       const response = await fetch("/api/profile", {
         method: "PATCH",
@@ -42,17 +36,17 @@ export default function ProfileClient({ initial }: { initial: Profile }) {
       });
       const result = await response.json();
       if (!response.ok) {
-        setNotice({ severity: "error", text: result.error ?? "Could not update your profile." });
+        showToast(result.error ?? "Could not update your profile.", "error");
         return;
       }
       const profile = { name: String(result.name), email: String(result.email) };
       setName(profile.name);
       setEmail(profile.email);
       setSaved(profile);
-      setNotice({ severity: "success", text: "Profile updated." });
+      showToast("Profile updated.", "success");
       router.refresh();
     } catch {
-      setNotice({ severity: "error", text: "Could not update your profile." });
+      showToast("Could not update your profile.", "error");
     } finally {
       setSaving(false);
     }
@@ -63,7 +57,6 @@ export default function ProfileClient({ initial }: { initial: Profile }) {
     <Typography color="text.secondary" sx={{ mt: 1, mb: 3 }}>
       Your email address is used for future magic-link sign-ins.
     </Typography>
-    {notice ? <Alert severity={notice.severity} onClose={() => setNotice(null)} sx={{ mb: 3 }}>{notice.text}</Alert> : null}
     <Box component="form" onSubmit={saveProfile} sx={{ display: "grid", gap: 2.5 }}>
       <TextField
         name="name"

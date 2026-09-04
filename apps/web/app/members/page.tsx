@@ -21,6 +21,6 @@ export default async function MembersPage() {
   return <Page>
     <Typography variant="h1">Members</Typography>
     <Typography color="text.secondary" sx={{ mt: 1, mb: 4 }}>Manage access to {access.workspaceName}.</Typography>
-    <Panel sx={{ p: 4 }}><MembersClient initial={serializable} /></Panel>
+    <MembersClient initial={serializable} currentUserId={access.userId} />
   </Page>;
 }

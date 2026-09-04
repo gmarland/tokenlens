@@ -7,7 +7,12 @@ vi.mock("./index", () => ({ db }));
 import {
   createWorkspaceInvitation,
   listWorkspaceInvitations,
+  removeWorkspaceInvitation,
+  removeWorkspaceMember,
   updateUserProfile,
+  updateWorkspaceInvitationRole,
+  updateWorkspaceMemberRole,
+  WorkspaceMembershipError,
 } from "./workspaces";
 
 describe("user profiles", () => {
@@ -84,5 +89,122 @@ describe("workspace invitations", () => {
       expect.arrayContaining(["workspace-1", "owner-1", "ada@example.com", "member"]),
     );
     expect(query.mock.calls[0][0]).toContain("created_at=now()");
+  });
+
+  it("updates an unaccepted invitation within the workspace", async () => {
+    const updated = { id: "invitation-1", email: "ada@example.com", role: "owner", status: "invited" };
+    const query = vi.fn(async () => [updated]);
+    db.mockResolvedValue({ query });
+
+    await expect(updateWorkspaceInvitationRole(
+      "workspace-1",
+      "invitation-1",
+      "owner",
+    )).resolves.toEqual(updated);
+
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining("accepted_at is null"),
+      ["workspace-1", "invitation-1", "owner"],
+    );
+  });
+
+  it("removes only an unaccepted invitation from the workspace", async () => {
+    const query = vi.fn(async () => [{ id: "invitation-1" }]);
+    db.mockResolvedValue({ query });
+
+    await expect(removeWorkspaceInvitation(
+      "workspace-1",
+      "invitation-1",
+    )).resolves.toEqual({ id: "invitation-1" });
+
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining("delete from workspace_invitations"),
+      ["workspace-1", "invitation-1"],
+    );
+    expect(query.mock.calls[0][0]).toContain("accepted_at is null");
+  });
+});
+
+describe("workspace member management", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("updates another member's role inside a workspace-locked transaction", async () => {
+    const query = vi.fn()
+      .mockResolvedValueOnce([{ role: "owner" }])
+      .mockResolvedValueOnce([{ role: "member" }])
+      .mockResolvedValueOnce([{ id: "member-1", role: "owner" }]);
+    const transaction = vi.fn(async (callback) => callback({ query }));
+    db.mockResolvedValue({ transaction });
+
+    await expect(updateWorkspaceMemberRole(
+      "workspace-1",
+      "owner-1",
+      "member-1",
+      "owner",
+    )).resolves.toEqual({ id: "member-1", role: "owner" });
+
+    expect(query.mock.calls[0][0]).toContain("for update of w");
+    expect(query.mock.calls[2]).toEqual([
+      expect.stringContaining("update workspace_memberships"),
+      ["workspace-1", "member-1", "owner"],
+    ]);
+  });
+
+  it("checks owner count before removing an owner", async () => {
+    const query = vi.fn()
+      .mockResolvedValueOnce([{ role: "owner" }])
+      .mockResolvedValueOnce([{ role: "owner" }])
+      .mockResolvedValueOnce([{ count: 2 }])
+      .mockResolvedValueOnce([{ id: "owner-2" }]);
+    db.mockResolvedValue({ transaction: vi.fn(async (callback) => callback({ query })) });
+
+    await expect(removeWorkspaceMember(
+      "workspace-1",
+      "owner-1",
+      "owner-2",
+    )).resolves.toEqual({ id: "owner-2" });
+
+    expect(query.mock.calls[2][0]).toContain("role='owner'");
+    expect(query.mock.calls[3][0]).toContain("delete from workspace_memberships");
+  });
+
+  it("rejects self-management", async () => {
+    const query = vi.fn().mockResolvedValueOnce([{ role: "owner" }]);
+    db.mockResolvedValue({ transaction: vi.fn(async (callback) => callback({ query })) });
+
+    await expect(removeWorkspaceMember(
+      "workspace-1",
+      "owner-1",
+      "owner-1",
+    )).rejects.toMatchObject<Partial<WorkspaceMembershipError>>({ code: "self_management" });
+    expect(query).toHaveBeenCalledTimes(1);
+  });
+
+  it("preserves the final owner", async () => {
+    const query = vi.fn()
+      .mockResolvedValueOnce([{ role: "owner" }])
+      .mockResolvedValueOnce([{ role: "owner" }])
+      .mockResolvedValueOnce([{ count: 1 }]);
+    db.mockResolvedValue({ transaction: vi.fn(async (callback) => callback({ query })) });
+
+    await expect(updateWorkspaceMemberRole(
+      "workspace-1",
+      "owner-1",
+      "owner-2",
+      "member",
+    )).rejects.toMatchObject<Partial<WorkspaceMembershipError>>({ code: "last_owner" });
+    expect(query).toHaveBeenCalledTimes(3);
+  });
+
+  it("rejects a stale non-owner actor inside the transaction", async () => {
+    const query = vi.fn().mockResolvedValueOnce([{ role: "member" }]);
+    db.mockResolvedValue({ transaction: vi.fn(async (callback) => callback({ query })) });
+
+    await expect(removeWorkspaceMember(
+      "workspace-1",
+      "former-owner",
+      "member-1",
+    )).rejects.toMatchObject<Partial<WorkspaceMembershipError>>({ code: "not_owner" });
+    expect(query).toHaveBeenCalledTimes(1);
   });
 });

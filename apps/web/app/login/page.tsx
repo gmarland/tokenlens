@@ -1,4 +1,3 @@
-import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import TextField from "@mui/material/TextField";
@@ -6,6 +5,7 @@ import Typography from "@mui/material/Typography";
 import { redirect } from "next/navigation";
 import { auth, signIn } from "../../auth";
 import { Page, Panel } from "../../components/ui";
+import { ToastOnMount } from "../../components/toast-provider";
 
 export default async function Login({
   searchParams,
@@ -16,11 +16,11 @@ export default async function Login({
     email?: string;
   }>;
 }) {
-  if (await auth()) redirect("/");
+  if (await auth()) redirect("/dashboard");
   const query = await searchParams;
   const callbackUrl = query.callbackUrl?.startsWith("/")
     ? query.callbackUrl
-    : "/";
+    : "/dashboard";
   return (
     <Page>
       <Panel sx={{ maxWidth: 480, mx: "auto", mt: 8, p: 4 }}>
@@ -30,16 +30,12 @@ export default async function Login({
         <Typography color="text.secondary" sx={{ mb: 3 }}>
           We’ll email you a secure sign-in link.
         </Typography>
-        {query.error ? (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            The sign-in link could not be sent or used.
-          </Alert>
-        ) : null}
+        {query.error ? <ToastOnMount message="The sign-in link could not be sent or used." severity="error" /> : null}
         <Box
           component="form"
           action={async (formData: FormData) => {
             "use server";
-            await signIn("nodemailer", {
+            await signIn("resend", {
               email: String(formData.get("email") ?? "")
                 .trim()
                 .toLowerCase(),

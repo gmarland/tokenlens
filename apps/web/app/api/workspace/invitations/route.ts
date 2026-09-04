@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
-import { createWorkspaceInvitation } from "@tokenlens/database";
+import {
+  createWorkspaceInvitation,
+  removeWorkspaceInvitation,
+  updateWorkspaceInvitationRole,
+} from "@tokenlens/database";
 import { requireOwner } from "../../../../lib/auth";
 import { sendWorkspaceInvitation } from "../../../../lib/email";
+
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export async function POST(request: Request) {
   const access = await requireOwner();
@@ -31,4 +37,33 @@ export async function POST(request: Request) {
     },
     emailSent,
   }, { status: 201 });
+}
+
+export async function PATCH(request: Request) {
+  const access = await requireOwner();
+  const body = await request.json().catch(() => ({})) as { id?: unknown; role?: unknown };
+  const id = typeof body.id === "string" ? body.id : "";
+  const role = body.role === "owner" ? "owner" : body.role === "member" ? "member" : null;
+  if (!uuidPattern.test(id) || !role) {
+    return NextResponse.json({ error: "A valid invitation and role are required." }, { status: 400 });
+  }
+
+  const invitation = await updateWorkspaceInvitationRole(access.workspaceId, id, role);
+  return invitation
+    ? NextResponse.json(invitation)
+    : NextResponse.json({ error: "Workspace invitation not found." }, { status: 404 });
+}
+
+export async function DELETE(request: Request) {
+  const access = await requireOwner();
+  const body = await request.json().catch(() => ({})) as { id?: unknown };
+  const id = typeof body.id === "string" ? body.id : "";
+  if (!uuidPattern.test(id)) {
+    return NextResponse.json({ error: "A valid invitation is required." }, { status: 400 });
+  }
+
+  const invitation = await removeWorkspaceInvitation(access.workspaceId, id);
+  return invitation
+    ? NextResponse.json(invitation)
+    : NextResponse.json({ error: "Workspace invitation not found." }, { status: 404 });
 }

@@ -1,6 +1,6 @@
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
-import Nodemailer from "next-auth/providers/nodemailer";
+import Resend from "next-auth/providers/resend";
 import PostgresAdapter from "@auth/pg-adapter";
 import { Pool } from "pg";
 import { provisionUserWorkspace } from "@tokenlens/database";
@@ -16,9 +16,9 @@ if (process.env.NODE_ENV !== "production")
   globalForAuth.tokenLensAuthPool = pool;
 
 const providers = [
-  Nodemailer({
-    server: process.env.EMAIL_SERVER ?? "smtp://localhost:1025",
-    from: process.env.EMAIL_FROM ?? "TokenLens <tokenlens@localhost>",
+  Resend({
+    apiKey: process.env.AUTH_RESEND_KEY,
+    from: process.env.EMAIL_FROM ?? "TokenLens <onboarding@resend.dev>",
   }),
 ];
 if (process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET) {

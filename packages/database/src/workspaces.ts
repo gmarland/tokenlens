@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import type { EntityManager } from "typeorm";
 import { db } from "./index";
 import { generateApiKey, hashKey } from "./auth";
 
@@ -10,6 +11,47 @@ export type WorkspaceAccess = {
 };
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
+
+export type WorkspaceMembershipErrorCode = "not_owner" | "self_management" | "last_owner";
+
+export class WorkspaceMembershipError extends Error {
+  constructor(
+    public readonly code: WorkspaceMembershipErrorCode,
+    message: string,
+  ) {
+    super(message);
+    this.name = "WorkspaceMembershipError";
+  }
+}
+
+async function lockWorkspaceForOwner(
+  manager: EntityManager,
+  workspaceId: string,
+  actorUserId: string,
+) {
+  const rows = await manager.query(
+    `select m.role
+     from workspaces w join workspace_memberships m on m.workspace_id=w.id and m.user_id=$2
+     where w.id=$1
+     for update of w`,
+    [workspaceId, actorUserId],
+  ) as { role: "owner" | "member" }[];
+  if (rows[0]?.role !== "owner") {
+    throw new WorkspaceMembershipError("not_owner", "Workspace owner access required.");
+  }
+}
+
+async function ensureNotLastOwner(manager: EntityManager, workspaceId: string) {
+  const rows = await manager.query(
+    `select count(*)::int count
+     from workspace_memberships
+     where workspace_id=$1 and role='owner'`,
+    [workspaceId],
+  ) as { count: number }[];
+  if (Number(rows[0]?.count ?? 0) <= 1) {
+    throw new WorkspaceMembershipError("last_owner", "A workspace must have at least one owner.");
+  }
+}
 
 export type UserProfile = {
   id: string;
@@ -158,6 +200,98 @@ export async function listWorkspaceInvitations(workspaceId: string) {
      order by i.created_at desc`,
     [workspaceId],
   );
+}
+
+export async function updateWorkspaceInvitationRole(
+  workspaceId: string,
+  invitationId: string,
+  role: "owner" | "member",
+) {
+  const database = await db();
+  const rows = await database.query(
+    `update workspace_invitations
+     set role=$3
+     where workspace_id=$1 and id=$2 and accepted_at is null
+     returning id,email,role,created_at,expires_at,
+       case when expires_at<=now() then 'expired' else 'invited' end status`,
+    [workspaceId, invitationId, role],
+  );
+  return rows[0] ?? null;
+}
+
+export async function removeWorkspaceInvitation(workspaceId: string, invitationId: string) {
+  const database = await db();
+  const rows = await database.query(
+    `delete from workspace_invitations
+     where workspace_id=$1 and id=$2 and accepted_at is null
+     returning id`,
+    [workspaceId, invitationId],
+  );
+  return rows[0] ?? null;
+}
+
+export async function updateWorkspaceMemberRole(
+  workspaceId: string,
+  actorUserId: string,
+  targetUserId: string,
+  role: "owner" | "member",
+) {
+  const database = await db();
+  return database.transaction(async (manager) => {
+    await lockWorkspaceForOwner(manager, workspaceId, actorUserId);
+    if (actorUserId === targetUserId) {
+      throw new WorkspaceMembershipError("self_management", "You cannot change your own workspace role.");
+    }
+
+    const targets = await manager.query(
+      `select role from workspace_memberships where workspace_id=$1 and user_id=$2`,
+      [workspaceId, targetUserId],
+    ) as { role: "owner" | "member" }[];
+    const target = targets[0];
+    if (!target) return null;
+    if (target.role === "owner" && role !== "owner") {
+      await ensureNotLastOwner(manager, workspaceId);
+    }
+
+    const rows = await manager.query(
+      `update workspace_memberships
+       set role=$3
+       where workspace_id=$1 and user_id=$2
+       returning user_id id,role`,
+      [workspaceId, targetUserId, role],
+    );
+    return rows[0] ?? null;
+  });
+}
+
+export async function removeWorkspaceMember(
+  workspaceId: string,
+  actorUserId: string,
+  targetUserId: string,
+) {
+  const database = await db();
+  return database.transaction(async (manager) => {
+    await lockWorkspaceForOwner(manager, workspaceId, actorUserId);
+    if (actorUserId === targetUserId) {
+      throw new WorkspaceMembershipError("self_management", "You cannot remove yourself from this workspace.");
+    }
+
+    const targets = await manager.query(
+      `select role from workspace_memberships where workspace_id=$1 and user_id=$2`,
+      [workspaceId, targetUserId],
+    ) as { role: "owner" | "member" }[];
+    const target = targets[0];
+    if (!target) return null;
+    if (target.role === "owner") await ensureNotLastOwner(manager, workspaceId);
+
+    const rows = await manager.query(
+      `delete from workspace_memberships
+       where workspace_id=$1 and user_id=$2
+       returning user_id id`,
+      [workspaceId, targetUserId],
+    );
+    return rows[0] ?? null;
+  });
 }
 
 export async function createWorkspaceApiKey(workspaceId: string, userId: string, name: string) {

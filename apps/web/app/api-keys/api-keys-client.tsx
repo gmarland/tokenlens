@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import type { FormEvent, ReactNode } from "react";
-import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
@@ -15,6 +14,7 @@ import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import { EmptyState, Label, Panel } from "../../components/ui";
 import { formatLocalTimestamp } from "../../lib/date-time";
+import { useToast } from "../../components/toast-provider";
 
 type ApiKey = {
   id: string;
@@ -40,11 +40,6 @@ type ManagementData = {
   agents: AgentInstallation[];
 };
 
-type Notice = {
-  severity: "success" | "error";
-  text: string;
-};
-
 type RevocationTarget = {
   type: "key" | "installation";
   id: string;
@@ -65,11 +60,9 @@ function MetadataItem({ label, children }: { label: string; children: ReactNode 
 }
 
 export default function ApiKeysClient({ initial, endpoint }: { initial: ManagementData; endpoint: string }) {
+  const showToast = useToast();
   const [data, setData] = useState(initial);
   const [createdKeyDetails, setCreatedKeyDetails] = useState<CreatedKeyDetails | null>(null);
-  const [copied, setCopied] = useState({ secret: false, command: false });
-  const [copyError, setCopyError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<Notice | null>(null);
   const [creating, setCreating] = useState(false);
   const [revoking, setRevoking] = useState(false);
   const [revocationTarget, setRevocationTarget] = useState<RevocationTarget | null>(null);
@@ -78,10 +71,7 @@ export default function ApiKeysClient({ initial, endpoint }: { initial: Manageme
   async function createKey(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setCreating(true);
-    setNotice(null);
     setCreatedKeyDetails(null);
-    setCopied({ secret: false, command: false });
-    setCopyError(null);
     const form = new FormData(event.currentTarget);
     try {
       const response = await fetch("/api/workspace/keys", {
@@ -91,7 +81,7 @@ export default function ApiKeysClient({ initial, endpoint }: { initial: Manageme
       });
       const result = await response.json();
       if (!response.ok) {
-        setNotice({ severity: "error", text: result.error ?? "Could not create API key." });
+        showToast(result.error ?? "Could not create API key.", "error");
         return;
       }
       const { secret: createdSecret, ...createdKey } = result;
@@ -105,7 +95,7 @@ export default function ApiKeysClient({ initial, endpoint }: { initial: Manageme
         keys: [{ ...createdKey, last_used_at: null, revoked_at: null }, ...current.keys],
       }));
     } catch {
-      setNotice({ severity: "error", text: "Could not create API key." });
+      showToast("Could not create API key.", "error");
     } finally {
       setCreating(false);
     }
@@ -114,23 +104,19 @@ export default function ApiKeysClient({ initial, endpoint }: { initial: Manageme
   async function copy(value: string, target: "secret" | "command") {
     try {
       await navigator.clipboard.writeText(value);
-      setCopied((current) => ({ ...current, [target]: true }));
-      setCopyError(null);
+      showToast(target === "secret" ? "Secret copied." : "Install command copied.", "success");
     } catch {
-      setCopyError(`Could not copy the ${target === "secret" ? "secret" : "install command"}. Select and copy it manually.`);
+      showToast(`Could not copy the ${target === "secret" ? "secret" : "install command"}. Select and copy it manually.`, "error");
     }
   }
 
   function closeCreatedKeyDialog() {
     setCreatedKeyDetails(null);
-    setCopied({ secret: false, command: false });
-    setCopyError(null);
   }
 
   async function revoke() {
     if (!revocationTarget) return;
     setRevoking(true);
-    setNotice(null);
     const route = revocationTarget.type === "key"
       ? "/api/workspace/keys"
       : "/api/workspace/agents";
@@ -142,25 +128,23 @@ export default function ApiKeysClient({ initial, endpoint }: { initial: Manageme
       });
       const result = await response.json();
       if (!response.ok) {
-        setNotice({ severity: "error", text: result.error ?? "Could not revoke access." });
+        showToast(result.error ?? "Could not revoke access.", "error");
         return;
       }
       const revokedAt = new Date().toISOString();
       setData((current) => revocationTarget.type === "key"
         ? { ...current, keys: current.keys.map((key) => key.id === revocationTarget.id ? { ...key, revoked_at: revokedAt } : key) }
         : { ...current, agents: current.agents.map((agent) => agent.id === revocationTarget.id ? { ...agent, revoked_at: revokedAt } : agent) });
-      setNotice({ severity: "success", text: `${revocationTarget.name} revoked.` });
+      showToast(`${revocationTarget.name} revoked.`, "success");
       setRevocationTarget(null);
     } catch {
-      setNotice({ severity: "error", text: "Could not revoke access." });
+      showToast("Could not revoke access.", "error");
     } finally {
       setRevoking(false);
     }
   }
 
   return <Box sx={{ display: "grid", gap: 4 }}>
-    {notice ? <Alert severity={notice.severity} onClose={() => setNotice(null)}>{notice.text}</Alert> : null}
-
     <Panel>
       <Typography variant="h2">Create an API key</Typography>
       <Typography color="text.secondary" sx={{ mt: 1, mb: 3, maxWidth: 700 }}>
@@ -266,8 +250,6 @@ export default function ApiKeysClient({ initial, endpoint }: { initial: Manageme
           <Typography sx={{ mt: .5 }}>For security, TokenLens cannot show it again after you close this dialog.</Typography>
         </Box>
 
-        {copyError ? <Alert severity="error" sx={{ mb: 3 }}>{copyError}</Alert> : null}
-
         <Typography variant="overline">Secret key</Typography>
         <Box sx={{ mt: 1, bgcolor: "primary.main", color: "primary.contrastText", border: 1, borderColor: "primary.main", p: { xs: 2, sm: 2.5 } }}>
           <Box component="code" sx={{ display: "block", color: "secondary.main", fontSize: { xs: 13, sm: 15 }, lineHeight: 1.6, overflowWrap: "anywhere", userSelect: "all" }}>
@@ -280,7 +262,7 @@ export default function ApiKeysClient({ initial, endpoint }: { initial: Manageme
             sx={{ mt: 2 }}
             onClick={() => createdKeyDetails && copy(createdKeyDetails.secret, "secret")}
           >
-            {copied.secret ? "Secret copied" : "Copy secret"}
+            Copy secret
           </Button>
         </Box>
 
@@ -297,16 +279,8 @@ export default function ApiKeysClient({ initial, endpoint }: { initial: Manageme
             sx={{ mt: 2, bgcolor: "background.paper" }}
             onClick={() => createdKeyDetails && copy(createdKeyDetails.installCommand, "command")}
           >
-            {copied.command ? "Command copied" : "Copy command"}
+            Copy command
           </Button>
-        </Box>
-        <Box
-          component="span"
-          role="status"
-          aria-live="polite"
-          sx={{ position: "absolute", width: 1, height: 1, p: 0, m: -1, overflow: "hidden", clip: "rect(0, 0, 0, 0)", whiteSpace: "nowrap", border: 0 }}
-        >
-          {copied.secret ? "Secret copied." : ""} {copied.command ? "Install command copied." : ""}
         </Box>
       </DialogContent>
       <Divider />

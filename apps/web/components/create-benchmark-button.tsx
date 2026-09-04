@@ -1,10 +1,10 @@
 "use client";
 
-import Alert from "@mui/material/Alert";
 import Button from "@mui/material/Button";
 import Stack from "@mui/material/Stack";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useToast } from "./toast-provider";
 
 export function CreateBenchmarkButton({
   repositoryId,
@@ -16,12 +16,11 @@ export function CreateBenchmarkButton({
   model: string;
 }) {
   const router = useRouter();
+  const showToast = useToast();
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   async function create() {
     setPending(true);
-    setError(null);
     try {
       const response = await fetch(`/api/repositories/${repositoryId}/benchmarks`, {
         method: "POST",
@@ -32,7 +31,7 @@ export function CreateBenchmarkButton({
       if (!response.ok || !body.id) throw new Error(body.error ?? "Could not create benchmark");
       router.push(`/benchmarks/${body.id}`);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Could not create benchmark");
+      showToast(reason instanceof Error ? reason.message : "Could not create benchmark", "error");
       setPending(false);
     }
   }
@@ -41,6 +40,5 @@ export function CreateBenchmarkButton({
     <Button disabled={pending} onClick={create} variant="contained">
       {pending ? "Creating…" : "Benchmark this prompt"}
     </Button>
-    {error ? <Alert severity="error">{error}</Alert> : null}
   </Stack>;
 }

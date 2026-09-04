@@ -1,18 +1,32 @@
 import { expect, test } from "@playwright/test";
 
-test("shows analytics across all providers and models by default", async ({ page }) => {
+test("explains the product and its privacy model on the public homepage", async ({ page }) => {
+  const pageErrors: Error[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error));
   await page.goto("/");
+  await expect(page.getByRole("heading", { name: "See what your coding agents spend their context on." })).toBeVisible();
+  await expect(page.getByText("Claude Code + Codex · Local repository analysis")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Understand the system without reading the work." })).toBeVisible();
+  await expect(page.getByText("TokenLens does collect prompt text", { exact: false })).toBeVisible();
+  expect(pageErrors).toEqual([]);
+});
+
+test("shows analytics across all providers and models by default", async ({ page }) => {
+  await page.goto("/dashboard");
   await expect(page.getByRole("heading", { name: "Repository context, made visible." })).toBeVisible();
   await expect(page.getByRole("combobox", { name: "Provider" })).toContainText("All providers");
   await expect(page.getByRole("combobox", { name: "Analysis model" })).toContainText("All models");
   await expect(page.getByRole("heading", { name: "Action centre" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Developers" })).toBeVisible();
+  await expect(page.getByRole("grid", { name: "Developers" })).toBeVisible();
   await expect(page.getByRole("alert").first().getByText("Source repository")).toBeVisible();
 });
 
 test("surfaces repository actions and diagnostic navigation", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/dashboard");
   const repository = page.getByRole("grid", { name: "Repositories" }).getByRole("link", { name: "tokenlens", exact: true });
   await repository.click();
+  await expect(page.getByRole("grid", { name: "Developers" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Recommended actions" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Prompt benchmarks" })).toBeHidden();
   await expect(page.getByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true");
