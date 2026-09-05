@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 test("explains the product and its privacy model on the public homepage", async ({ page }) => {
+  await page.context().clearCookies();
   const pageErrors: Error[] = [];
   page.on("pageerror", (error) => pageErrors.push(error));
   await page.goto("/");
@@ -8,11 +9,26 @@ test("explains the product and its privacy model on the public homepage", async 
   await expect(page.getByText("Claude Code + Codex · Local repository analysis")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Understand the system without reading the work." })).toBeVisible();
   await expect(page.getByText("TokenLens does collect prompt text", { exact: false })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Sign in" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Open account menu" })).toHaveCount(0);
   expect(pageErrors).toEqual([]);
+});
+
+test("keeps anonymous users out of application pages and APIs", async ({ page }) => {
+  await page.context().clearCookies();
+  await page.goto("/dashboard?provider=codex");
+  await expect(page).toHaveURL(/\/login\?callbackUrl=%2Fdashboard%3Fprovider%3Dcodex$/);
+  await expect(page.getByRole("heading", { name: "Sign in to TokenLens" })).toBeVisible();
+
+  const response = await page.request.get("/api/repositories");
+  expect(response.status()).toBe(401);
+  await expect(response.json()).resolves.toEqual({ error: "unauthorized" });
 });
 
 test("shows analytics across all providers and models by default", async ({ page }) => {
   await page.goto("/dashboard");
+  await expect(page.getByRole("button", { name: "Open account menu" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Start measuring" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Repository context, made visible." })).toBeVisible();
   await expect(page.getByRole("combobox", { name: "Provider" })).toContainText("All providers");
   await expect(page.getByRole("combobox", { name: "Analysis model" })).toContainText("All models");
@@ -38,7 +54,7 @@ test("surfaces repository actions and diagnostic navigation", async ({ page }) =
   await page.getByRole("tab", { name: "Benchmarks" }).click();
   await expect(page).toHaveURL(new URL(`${repositoryUrl.pathname}/benchmarks`, repositoryUrl).toString());
   await expect(page.getByRole("tab", { name: "Benchmarks" })).toHaveAttribute("aria-selected", "true");
-  await expect(page.getByRole("heading", { name: /Prompt benchmarks/ })).toBeVisible();
+  await expect(page.getByText("Repeatable observations", { exact: true })).toBeVisible();
 
   await page.getByRole("tab", { name: "Agent behaviour" }).click();
   await expect(page).toHaveURL(new URL(`${repositoryUrl.pathname}/behaviour`, repositoryUrl).toString());

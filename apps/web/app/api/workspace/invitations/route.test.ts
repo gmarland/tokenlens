@@ -8,8 +8,8 @@ const mocks = vi.hoisted(() => ({
   updateWorkspaceInvitationRole: vi.fn(),
 }));
 
-vi.mock("../../../../lib/auth", () => ({
-  requireOwner: mocks.requireOwner,
+vi.mock("../../../../lib/api-auth", () => ({
+  authorizeApi: async () => ({ ok: true, access: await mocks.requireOwner() }),
 }));
 vi.mock("../../../../lib/email", () => ({
   sendWorkspaceInvitation: mocks.sendWorkspaceInvitation,

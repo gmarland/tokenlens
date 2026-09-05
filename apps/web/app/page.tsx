@@ -6,8 +6,9 @@ import Container from "@mui/material/Container";
 import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
-import { auth } from "../auth";
+import { redirect } from "next/navigation";
 import Link from "../components/link";
+import { currentWorkspace } from "../lib/auth";
 
 export const metadata: Metadata = {
   title: "TokenLens — Make coding-agent context visible",
@@ -101,9 +102,7 @@ function Feature({ number, title, children }: { number: string; title: string; c
 }
 
 export default async function MarketingHome() {
-  const session = await auth();
-  const ctaHref = session?.user ? "/dashboard" : "/login";
-  const ctaLabel = session?.user ? "Open dashboard" : "Start measuring";
+  if (await currentWorkspace()) redirect("/dashboard");
 
   return (
     <Box component="main">
@@ -141,8 +140,8 @@ export default async function MarketingHome() {
                 TokenLens connects Claude Code and Codex telemetry with repository structure, so your team can find context-heavy hotspots, diagnose friction, and validate improvements.
               </Typography>
               <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ mt: 4, alignItems: { xs: "stretch", sm: "center" } }}>
-                <Button component={Link} href={ctaHref} variant="contained" size="large">
-                  {ctaLabel}<Arrow />
+                <Button component={Link} href="/login" variant="contained" size="large">
+                  Start measuring<Arrow />
                 </Button>
                 <Button component="a" href="#product" variant="outlined" size="large">
                   See how it works
@@ -256,8 +255,8 @@ export default async function MarketingHome() {
                 Measure repositories and agent workflows—not employee productivity. Connect your first coding-agent installation and start building an evidence base.
               </Typography>
             </Box>
-            <Button component={Link} href={ctaHref} variant="contained" size="large" sx={{ bgcolor: "primary.main", color: "primary.contrastText", whiteSpace: "nowrap" }}>
-              {ctaLabel}<Arrow />
+            <Button component={Link} href="/login" variant="contained" size="large" sx={{ bgcolor: "primary.main", color: "primary.contrastText", whiteSpace: "nowrap" }}>
+              Start measuring<Arrow />
             </Button>
           </Box>
         </Paper>

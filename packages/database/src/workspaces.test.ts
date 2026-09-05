@@ -12,6 +12,7 @@ import {
   updateUserProfile,
   updateWorkspaceInvitationRole,
   updateWorkspaceMemberRole,
+  workspaceUserAccess,
   WorkspaceMembershipError,
 } from "./workspaces";
 
@@ -47,6 +48,34 @@ describe("user profiles", () => {
       name: "Ada",
       email: "ada@example.com",
     })).resolves.toBeNull();
+  });
+});
+
+describe("authenticated workspace access", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("loads current profile and membership values for a JWT identity", async () => {
+    const access = {
+      userId: "user-1",
+      workspaceId: "workspace-1",
+      workspaceName: "Analytical Engines",
+      role: "member",
+      name: "Ada Lovelace",
+      email: "ada@example.com",
+    };
+    const query = vi.fn(async () => [access]);
+    db.mockResolvedValue({ query });
+
+    await expect(workspaceUserAccess("user-1")).resolves.toEqual(access);
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining("join users u on u.id=m.user_id"),
+      ["user-1"],
+    );
+  });
+
+  it("rejects a JWT identity whose user or membership no longer exists", async () => {
+    db.mockResolvedValue({ query: vi.fn(async () => []) });
+    await expect(workspaceUserAccess("missing-user")).resolves.toBeNull();
   });
 });
 

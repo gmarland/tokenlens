@@ -10,6 +10,11 @@ export type WorkspaceAccess = {
   role: "owner" | "member";
 };
 
+export type WorkspaceUserAccess = WorkspaceAccess & {
+  name: string;
+  email: string;
+};
+
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
 export type WorkspaceMembershipErrorCode = "not_owner" | "self_management" | "last_owner";
@@ -162,6 +167,21 @@ export async function workspaceAccess(userId: string, requestedWorkspaceId?: str
      order by m.created_at desc limit 1`,
     parameters,
   ) as WorkspaceAccess[];
+  return rows[0] ?? null;
+}
+
+export async function workspaceUserAccess(userId: string): Promise<WorkspaceUserAccess | null> {
+  const database = await db();
+  const rows = await database.query(
+    `select m.user_id "userId",m.workspace_id "workspaceId",w.name "workspaceName",m.role,
+            coalesce(u.name,'') name,u.email
+     from workspace_memberships m
+     join workspaces w on w.id=m.workspace_id
+     join users u on u.id=m.user_id
+     where m.user_id=$1
+     order by m.created_at desc limit 1`,
+    [userId],
+  ) as WorkspaceUserAccess[];
   return rows[0] ?? null;
 }
 

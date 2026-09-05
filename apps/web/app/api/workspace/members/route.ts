@@ -4,7 +4,7 @@ import {
   updateWorkspaceMemberRole,
   WorkspaceMembershipError,
 } from "@tokenlens/database";
-import { requireOwner } from "../../../../lib/auth";
+import { authorizeApi } from "../../../../lib/api-auth";
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -17,7 +17,9 @@ function membershipErrorResponse(error: unknown) {
 }
 
 export async function PATCH(request: Request) {
-  const access = await requireOwner();
+  const authorization = await authorizeApi("owner");
+  if (!authorization.ok) return authorization.response;
+  const access = authorization.access;
   const body = await request.json().catch(() => ({})) as { id?: unknown; role?: unknown };
   const id = typeof body.id === "string" ? body.id : "";
   const role = body.role === "owner" ? "owner" : body.role === "member" ? "member" : null;
@@ -36,7 +38,9 @@ export async function PATCH(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const access = await requireOwner();
+  const authorization = await authorizeApi("owner");
+  if (!authorization.ok) return authorization.response;
+  const access = authorization.access;
   const body = await request.json().catch(() => ({})) as { id?: unknown };
   const id = typeof body.id === "string" ? body.id : "";
   if (!uuidPattern.test(id)) {

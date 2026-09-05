@@ -45,7 +45,9 @@ enabled when `AUTH_GOOGLE_ID` and `AUTH_GOOGLE_SECRET` are configured. Each new
 account receives a workspace and owner membership; verified
 `gareth.marland@gmail.com` claims the existing unowned workspace. Owners can
 invite other users and create, rotate, or revoke write-only ingestion keys from
-the API Keys page.
+the API Keys page. Dashboard sessions use Auth.js encrypted JWT cookies with a
+seven-day lifetime. Workspace membership and owner permissions are loaded from
+the database on protected requests so access changes take effect immediately.
 
 Set a long random `AUTH_SECRET` in every environment. Email delivery uses
 Resend for both magic links and workspace invitations. Set `AUTH_RESEND_KEY` to

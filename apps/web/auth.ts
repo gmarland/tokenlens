@@ -1,4 +1,5 @@
 import NextAuth from "next-auth";
+import type { NextAuthConfig } from "next-auth";
 import Google from "next-auth/providers/google";
 import Resend from "next-auth/providers/resend";
 import PostgresAdapter from "@auth/pg-adapter";
@@ -30,11 +31,14 @@ if (process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET) {
   );
 }
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+export const authConfig = {
   adapter: PostgresAdapter(pool),
   providers,
   pages: { signIn: "/login", verifyRequest: "/login/verify" },
-  session: { strategy: "database" },
+  session: {
+    strategy: "jwt",
+    maxAge: 7 * 24 * 60 * 60,
+  },
   trustHost: true,
   events: {
     async createUser({ user }) {
@@ -43,23 +47,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
   },
   callbacks: {
-    async session({ session, user }) {
-      if (!session.user || !user.id || !user.email) return session;
-      const access = await provisionUserWorkspace(
-        user.id,
-        user.email,
-        user.name,
-      );
-      const sessionUser = session.user as typeof session.user & {
-        workspaceId: string;
-        workspaceName: string;
-        workspaceRole: "owner" | "member";
-      };
-      sessionUser.id = user.id;
-      sessionUser.workspaceId = access.workspaceId;
-      sessionUser.workspaceName = access.workspaceName;
-      sessionUser.workspaceRole = access.role;
+    async jwt({ token, user }) {
+      if (user?.id) {
+        token.userId = user.id;
+        if (user.email) {
+          await provisionUserWorkspace(user.id, user.email, user.name);
+        }
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      if (!session.user || typeof token.userId !== "string") return session;
+      session.user.id = token.userId;
       return session;
     },
   },
-});
+} satisfies NextAuthConfig;
+
+export const { handlers, auth, signIn, signOut } = NextAuth(authConfig);

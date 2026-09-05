@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
 import { auth } from "./auth";
+import { accessDecision } from "./lib/route-access";
 
 export const proxy = auth((request) => {
   const path = request.nextUrl.pathname;
-  const publicRoute =
-    path === "/" || path.startsWith("/login") || path.startsWith("/api/auth");
-  if (publicRoute || request.auth) return NextResponse.next();
+  const decision = accessDecision(path, Boolean(request.auth));
+  if (decision === "dashboard") {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+  if (decision === "allow") return NextResponse.next();
   if (path.startsWith("/api/")) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }

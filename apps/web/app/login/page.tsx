@@ -3,9 +3,10 @@ import Button from "@mui/material/Button";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import { redirect } from "next/navigation";
-import { auth, signIn } from "../../auth";
+import { signIn } from "../../auth";
 import { Page, Panel } from "../../components/ui";
 import { ToastOnMount } from "../../components/toast-provider";
+import { currentWorkspace } from "../../lib/auth";
 
 export default async function Login({
   searchParams,
@@ -16,7 +17,7 @@ export default async function Login({
     email?: string;
   }>;
 }) {
-  if (await auth()) redirect("/dashboard");
+  if (await currentWorkspace()) redirect("/dashboard");
   const query = await searchParams;
   const callbackUrl = query.callbackUrl?.startsWith("/")
     ? query.callbackUrl

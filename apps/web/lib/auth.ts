@@ -1,28 +1,25 @@
 import { redirect } from "next/navigation";
 import { cache } from "react";
 import { auth } from "../auth";
-import { db } from "@tokenlens/database";
+import { db, workspaceUserAccess } from "@tokenlens/database";
 
-export async function currentWorkspace() {
+const resolveCurrentWorkspace = cache(async () => {
   const session = await auth();
-  const user = session?.user as ({
-    id?: string;
-    name?: string | null;
-    email?: string | null;
-    workspaceId?: string;
-    workspaceName?: string;
-    workspaceRole?: "owner" | "member";
-  }) | undefined;
-  if (!user?.id || !user.workspaceId || !user.workspaceName || !user.workspaceRole) return null;
+  const userId = session?.user?.id;
+  if (!userId) return null;
+  const access = await workspaceUserAccess(userId);
+  if (!access) return null;
   return {
-    userId: user.id,
-    name: user.name ?? "",
-    email: user.email ?? "",
-    workspaceId: user.workspaceId,
-    workspaceName: user.workspaceName,
-    role: user.workspaceRole,
+    userId: access.userId,
+    name: access.name,
+    email: access.email,
+    workspaceId: access.workspaceId,
+    workspaceName: access.workspaceName,
+    role: access.role,
   };
-}
+});
+
+export const currentWorkspace = resolveCurrentWorkspace;
 
 async function resolveWorkspace() {
   const access = await currentWorkspace();

@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { createWorkspaceApiKey, revokeWorkspaceApiKey } from "@tokenlens/database";
-import { requireOwner } from "../../../../lib/auth";
+import { authorizeApi } from "../../../../lib/api-auth";
 
 export async function POST(request: Request) {
-  const access = await requireOwner();
+  const authorization = await authorizeApi("owner");
+  if (!authorization.ok) return authorization.response;
+  const access = authorization.access;
   const body = await request.json().catch(() => ({})) as { name?: unknown };
   if (body.name != null && typeof body.name !== "string") {
     return NextResponse.json({ error: "invalid key name" }, { status: 400 });
@@ -13,7 +15,9 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const access = await requireOwner();
+  const authorization = await authorizeApi("owner");
+  if (!authorization.ok) return authorization.response;
+  const access = authorization.access;
   const body = await request.json().catch(() => ({})) as { id?: unknown };
   if (typeof body.id !== "string") return NextResponse.json({ error: "invalid key" }, { status: 400 });
   try {
